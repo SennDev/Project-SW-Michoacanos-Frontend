@@ -1,0 +1,10 @@
+/dist
+/tmp
+/out-tsc
+/node_modules
+/.angular/cache
+npm-debug.log
+yarn-error.log
+*.log
+coverage
+.env
