@@ -4,8 +4,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { HealthService } from '../../core/services/health.service';
+import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { PeriodsService } from '../../services/periods.service';
 import { AcademicsService } from '../../services/academics.service';
+import { GradesService } from '../../services/grades.service';
 import { ReportsService } from '../../services/reports.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
@@ -13,7 +15,8 @@ import { ChartCardComponent } from '../../shared/components/chart-card/chart-car
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { HealthStatus } from '../../shared/models/api.models';
-import { Period, Subject, Teacher } from '../../shared/models/academic.models';
+import { Period, Student, Subject, Teacher } from '../../shared/models/academic.models';
+import { GradeSummary } from '../../shared/models/grade.models';
 import { ChartPoint } from '../../shared/models/ui.models';
 import { StudentStats, TeacherStats } from '../../shared/models/report.models';
 
@@ -24,6 +27,14 @@ interface DashboardState {
   health: HealthStatus[];
   teacherStats: TeacherStats[];
   studentStats: StudentStats[];
+}
+
+interface TeacherOverview {
+  totalStudents: number;
+  overallAverage: number;
+  passRate: number;
+  atRiskStudents: number;
+  attendanceRate: number;
 }
 
 @Component({
@@ -65,12 +76,22 @@ interface DashboardState {
         </div>
       </section>
 
-      <section class="grid-4">
-        <agm-kpi-card label="Periodos" [value]="state().periods.length" delta="Ciclos registrados" tone="primary" />
-        <agm-kpi-card label="Materias" [value]="state().subjects.length" delta="Disponibles por REST" tone="success" />
-        <agm-kpi-card label="Docentes" [value]="state().teachers.length || 'N/D'" delta="Directorio academico" tone="warning" />
-        <agm-kpi-card label="Servicios online" [value]="onlineCount()" [delta]="state().health.length + ' servicios monitoreados'" [tone]="onlineCount() === state().health.length ? 'success' : 'danger'" />
-      </section>
+      @if (isTeacher()) {
+        <section class="teacher-kpis">
+          <agm-kpi-card label="Alumnos" [value]="teacherOverview().totalStudents" delta="Inscritos en tus materias" tone="primary" />
+          <agm-kpi-card label="Promedio general" [value]="teacherOverview().overallAverage" [tone]="teacherOverview().overallAverage >= 70 ? 'success' : 'warning'" />
+          <agm-kpi-card label="Aprobacion" [value]="teacherOverview().passRate + '%'" [tone]="teacherOverview().passRate >= 70 ? 'success' : 'warning'" />
+          <agm-kpi-card label="En riesgo" [value]="teacherOverview().atRiskStudents" [tone]="teacherOverview().atRiskStudents ? 'danger' : 'success'" />
+          <agm-kpi-card label="Asistencia" [value]="teacherOverview().attendanceRate + '%'" [tone]="teacherOverview().attendanceRate >= 80 ? 'success' : 'warning'" />
+        </section>
+      } @else {
+        <section class="grid-4">
+          <agm-kpi-card label="Periodos" [value]="state().periods.length" delta="Ciclos registrados" tone="primary" />
+          <agm-kpi-card label="Materias" [value]="state().subjects.length" delta="Visibles para tu rol" tone="success" />
+          <agm-kpi-card label="Docentes" [value]="state().teachers.length || 'N/D'" delta="Directorio academico" tone="warning" />
+          <agm-kpi-card label="Servicios online" [value]="onlineCount()" [delta]="state().health.length + ' servicios monitoreados'" [tone]="onlineCount() === state().health.length ? 'success' : 'danger'" />
+        </section>
+      }
 
       <section class="grid-2" style="margin-top: 18px;">
         <agm-chart-card
@@ -133,6 +154,42 @@ interface DashboardState {
           }
         </article>
       </section>
+
+      @if (isTeacher()) {
+        <section class="grid-2 teacher-grid" style="margin-top: 18px;">
+          <article class="panel pad">
+            <div class="row between">
+              <h2 class="panel-title">Materias asignadas</h2>
+              <a class="btn ghost small" routerLink="/academics">Ver grupos</a>
+            </div>
+            @if (state().subjects.length) {
+              <div class="subject-list">
+                @for (subject of state().subjects; track subject.id) {
+                  <div class="subject-row">
+                    <div>
+                      <strong>{{ subject.nombre }}</strong>
+                      <span>{{ subject.nrc }} | {{ subject.seccion }} | {{ subject.salon || 'Salon pendiente' }}</span>
+                    </div>
+                    <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <agm-empty-state title="Sin materias asignadas" message="Cuando exista asignacion docente, apareceran aqui tus grupos activos." />
+            }
+          </article>
+
+          <article class="panel pad">
+            <h2 class="panel-title">Lectura rapida</h2>
+            <div class="metric-list">
+              <div class="metric-row"><span>Materias activas</span><strong>{{ openSubjects() }}</strong></div>
+              <div class="metric-row"><span>Materias con sesiones</span><strong>{{ subjectsWithSessions() }}</strong></div>
+              <div class="metric-row"><span>Promedio ponderado</span><strong>{{ teacherOverview().overallAverage }}</strong></div>
+              <div class="metric-row"><span>Alumnos con seguimiento</span><strong>{{ teacherOverview().atRiskStudents }}</strong></div>
+            </div>
+          </article>
+        </section>
+      }
     }
   `,
   styles: [`
@@ -220,8 +277,51 @@ interface DashboardState {
       font-size: 0.84rem;
     }
 
+    .teacher-kpis {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .subject-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .subject-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 13px;
+      border: 1px solid var(--agm-border);
+      border-radius: var(--agm-radius-sm);
+      background: var(--agm-surface-muted);
+    }
+
+    .subject-row strong,
+    .subject-row span {
+      display: block;
+    }
+
+    .subject-row span:not(.status-badge) {
+      margin-top: 3px;
+      color: var(--agm-text-soft);
+      font-size: 0.84rem;
+    }
+
     @media (max-width: 920px) {
       .dashboard-hero {
+        grid-template-columns: 1fr;
+      }
+
+      .teacher-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .teacher-kpis {
         grid-template-columns: 1fr;
       }
     }
@@ -231,7 +331,9 @@ export class DashboardScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly periods = inject(PeriodsService);
+  private readonly subjectScope = inject(SubjectScopeService);
   private readonly academics = inject(AcademicsService);
+  private readonly grades = inject(GradesService);
   private readonly health = inject(HealthService);
   private readonly reports = inject(ReportsService);
 
@@ -243,6 +345,13 @@ export class DashboardScreen implements OnInit {
     health: [],
     teacherStats: [],
     studentStats: []
+  });
+  readonly teacherOverview = signal<TeacherOverview>({
+    totalStudents: 0,
+    overallAverage: 0,
+    passRate: 0,
+    atRiskStudents: 0,
+    attendanceRate: 0
   });
 
   readonly title = computed(() => {
@@ -264,6 +373,7 @@ export class DashboardScreen implements OnInit {
   readonly onlineCount = computed(() => this.state().health.filter((item) => item.status === 'online').length);
   readonly openSubjects = computed(() => this.state().subjects.filter((subject) => subject.estado === 'abierta').length);
   readonly activePeriodName = computed(() => this.state().periods.find((period) => period.activo)?.nombre ?? 'Sin periodo activo');
+  readonly subjectsWithSessions = computed(() => this.state().teacherStats.filter((stat) => stat.sesiones > 0).length);
 
   readonly subjectChart = computed<ChartPoint[]>(() => {
     const grouped = new Map<number, number>();
@@ -325,6 +435,10 @@ export class DashboardScreen implements OnInit {
     return 'Dashboard admin';
   }
 
+  isTeacher(): boolean {
+    return this.auth.role() === 'docente';
+  }
+
   heroTitle(): string {
     const role = this.auth.role();
     if (role === 'docente') {
@@ -353,7 +467,8 @@ export class DashboardScreen implements OnInit {
       return [
         { label: 'Capturar calificaciones', description: 'Ponderaciones, actividades y concentrados', route: '/grades' },
         { label: 'Abrir asistencia', description: 'Sesion QR con cierre controlado', route: '/attendance' },
-        { label: 'Descargar reportes', description: 'PDF y XLSX por materia', route: '/reports' }
+        { label: 'Descargar reportes', description: 'PDF y XLSX por materia', route: '/reports' },
+        { label: 'Gestionar grupos', description: 'Alumnos inscritos y materias', route: '/academics' }
       ];
     }
     if (role === 'alumno') {
@@ -381,14 +496,62 @@ export class DashboardScreen implements OnInit {
 
     forkJoin({
       periods: this.periods.listPeriods().pipe(catchError(() => of([]))),
-      subjects: this.periods.listSubjects(undefined, 1, 100).pipe(catchError(() => of([]))),
+      subjects: this.subjectScope.listVisibleSubjects().pipe(catchError(() => of([]))),
       teachers: this.auth.role() === 'alumno' ? of([]) : this.academics.listTeachers().pipe(catchError(() => of([]))),
       health: this.health.checkAll(),
       teacherStats: roleStats$,
       studentStats: studentStats$
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((state) => {
       this.state.set(state);
+      if (user?.role === 'docente') {
+        this.loadTeacherOverview(state.subjects, state.teacherStats);
+      }
       this.loading.set(false);
+    });
+  }
+
+  private loadTeacherOverview(subjects: Subject[], stats: TeacherStats[]): void {
+    if (!subjects.length) {
+      this.teacherOverview.set({
+        totalStudents: 0,
+        overallAverage: 0,
+        passRate: 0,
+        atRiskStudents: 0,
+        attendanceRate: 0
+      });
+      return;
+    }
+
+    forkJoin(subjects.map((subject) => forkJoin({
+      subject: of(subject),
+      students: this.academics.listStudentsBySubject(subject.id).pipe(catchError(() => of([] as Student[]))),
+      summary: this.grades.getConcentrado(subject.id).pipe(catchError(() => of([] as GradeSummary[])))
+    }))).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((packs) => {
+      const uniqueStudentIds = new Set(packs.flatMap((pack) => pack.students.map((student) => student.id)));
+      const gradeRows = packs.flatMap((pack) => pack.summary);
+      const atRiskStudentIds = new Set(gradeRows.filter((row) => row.promedio_redondeado < 70).map((row) => row.alumno_id));
+      const overallAverage = gradeRows.length
+        ? Math.round((gradeRows.reduce((sum, row) => sum + row.promedio_real, 0) / gradeRows.length) * 10) / 10
+        : 0;
+      const passRate = gradeRows.length
+        ? Math.round((gradeRows.filter((row) => row.promedio_redondeado >= 70).length / gradeRows.length) * 100)
+        : 0;
+      const attendanceSlots = packs.reduce((sum, pack) => {
+        const sessions = stats.find((stat) => stat.materia_id === pack.subject.id)?.sesiones ?? 0;
+        return sum + (sessions * pack.students.length);
+      }, 0);
+      const attendedSlots = stats.reduce((sum, stat) => sum + stat.asistencias + stat.retardos, 0);
+      const attendanceRate = attendanceSlots
+        ? Math.min(100, Math.round((attendedSlots / attendanceSlots) * 100))
+        : 0;
+
+      this.teacherOverview.set({
+        totalStudents: uniqueStudentIds.size,
+        overallAverage,
+        passRate,
+        atRiskStudents: atRiskStudentIds.size,
+        attendanceRate
+      });
     });
   }
 }

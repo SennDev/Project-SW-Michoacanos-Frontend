@@ -1,12 +1,13 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
+import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
-import { PeriodsService } from '../../services/periods.service';
+import { AcademicsService } from '../../services/academics.service';
 import { AttendanceService } from '../../services/attendance.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
@@ -14,8 +15,21 @@ import { SearchableTableComponent } from '../../shared/components/searchable-tab
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { AttendanceRecord, AttendanceSession, QrPayload } from '../../shared/models/attendance.models';
-import { Subject } from '../../shared/models/academic.models';
+import { Student, Subject } from '../../shared/models/academic.models';
 import { TableColumn } from '../../shared/models/ui.models';
+
+interface AttendanceHistoryRow extends AttendanceRecord {
+  student_name: string;
+  matricula: string;
+}
+
+interface StudentAttendanceSummary {
+  student: Student;
+  present: number;
+  late: number;
+  absences: number;
+  percentage: number;
+}
 
 @Component({
   selector: 'agm-attendance-screen',
@@ -35,9 +49,9 @@ import { TableColumn } from '../../shared/models/ui.models';
     } @else {
       <section class="grid-4">
         <agm-kpi-card label="Materias" [value]="subjects().length" tone="primary" />
-        <agm-kpi-card label="Sesiones locales" [value]="sessions().length" tone="warning" />
-        <agm-kpi-card label="Registros" [value]="history().length" tone="success" />
-        <agm-kpi-card label="Presentes" [value]="presentCount()" tone="success" />
+        <agm-kpi-card label="Sesiones" [value]="sessionCount()" tone="warning" />
+        <agm-kpi-card label="Asistencia" [value]="attendanceRate() + '%'" [tone]="attendanceRate() >= 80 ? 'success' : 'warning'" />
+        <agm-kpi-card label="Retardos" [value]="lateCount()" tone="warning" />
       </section>
 
       <section class="attendance-stage">
@@ -54,7 +68,7 @@ import { TableColumn } from '../../shared/models/ui.models';
         <div class="session-display">
           <span>ID de sesion</span>
           <strong>{{ activeSession()?.session_id || '--' }}</strong>
-          <small>Cierre: {{ activeSession()?.closes_at ? (activeSession()?.closes_at | slice:0:16) : 'Pendiente' }}</small>
+          <small>{{ sessionWindowLabel() }}</small>
         </div>
       </section>
 
@@ -87,7 +101,7 @@ import { TableColumn } from '../../shared/models/ui.models';
               @if (activeSession()) {
                 <div class="teacher-session-card">
                   <strong>Comparte el ID {{ activeSession()?.session_id }}</strong>
-                  <span>El alumno genera su QR desde su cuenta y el docente registra el token escaneado.</span>
+                  <span>{{ isSessionExpired() ? 'La ventana ya vencio; cierra la sesion o inicia una nueva.' : 'La sesion sigue disponible para validar QR.' }}</span>
                 </div>
               }
               <div class="field">
@@ -95,6 +109,9 @@ import { TableColumn } from '../../shared/models/ui.models';
                 <textarea rows="4" [(ngModel)]="qrToken" placeholder="Pega aqui el token del alumno"></textarea>
               </div>
               <button class="btn ghost" type="button" [disabled]="registering()" (click)="registerAttendance()">Registrar asistencia</button>
+              @if (activeSession()) {
+                <button class="btn danger" type="button" (click)="closeSession(activeSession()!)">Cerrar sesion activa</button>
+              }
             </div>
           </article>
         }
@@ -134,9 +151,43 @@ import { TableColumn } from '../../shared/models/ui.models';
         </article>
       </section>
 
+      <section class="grid-2" style="margin-top: 18px;">
+        <article class="panel pad">
+          <h2 class="panel-title">{{ isStudent() ? 'Mi asistencia' : 'Resumen del grupo' }}</h2>
+          <div class="metric-list">
+            <div class="metric-row"><span>Sesiones registradas</span><strong>{{ sessionCount() }}</strong></div>
+            <div class="metric-row"><span>Asistencia global</span><strong>{{ attendanceRate() }}%</strong></div>
+            <div class="metric-row"><span>Faltas estimadas</span><strong>{{ absenceCount() }}</strong></div>
+            <div class="metric-row"><span>Alumnos bajo 80%</span><strong>{{ lowAttendanceCount() }}</strong></div>
+          </div>
+        </article>
+
+        <article class="panel pad">
+          <h2 class="panel-title">Seguimiento</h2>
+          @if (studentSummaries().length) {
+            <div class="attendance-summary-list">
+              @for (item of studentSummaries().slice(0, 6); track item.student.id) {
+                <div>
+                  <div class="row between">
+                    <strong>{{ item.student.nombre }}</strong>
+                    <span class="status-badge" [class]="item.percentage >= 80 ? 'success' : item.percentage >= 70 ? 'warning' : 'danger'">
+                      {{ item.percentage }}%
+                    </span>
+                  </div>
+                  <div class="progress"><span [style.--value]="item.percentage + '%'"></span></div>
+                  <small>{{ item.present }} presentes | {{ item.late }} retardos | {{ item.absences }} faltas</small>
+                </div>
+              }
+            </div>
+          } @else {
+            <agm-empty-state title="Sin historial suficiente" message="Los porcentajes aparecen cuando existan sesiones y registros para la materia." />
+          }
+        </article>
+      </section>
+
       <section style="margin-top: 18px;">
         <agm-searchable-table
-          [rows]="history()"
+          [rows]="historyRows()"
           [columns]="historyColumns"
           placeholder="Buscar por alumno, sesion o estado"
           emptyTitle="Sin asistencias"
@@ -236,6 +287,20 @@ import { TableColumn } from '../../shared/models/ui.models';
       padding: 10px;
     }
 
+    .attendance-summary-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .attendance-summary-list > div {
+      display: grid;
+      gap: 7px;
+    }
+
+    .attendance-summary-list small {
+      color: var(--agm-text-soft);
+    }
+
     @media (max-width: 720px) {
       .attendance-stage {
         grid-template-columns: 1fr;
@@ -246,7 +311,8 @@ import { TableColumn } from '../../shared/models/ui.models';
 export class AttendanceScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
-  private readonly periods = inject(PeriodsService);
+  private readonly subjectScope = inject(SubjectScopeService);
+  private readonly academics = inject(AcademicsService);
   private readonly attendance = inject(AttendanceService);
   private readonly toasts = inject(ToastService);
 
@@ -258,14 +324,52 @@ export class AttendanceScreen implements OnInit {
   readonly selectedSubjectId = signal<number | null>(null);
   readonly sessions = signal<AttendanceSession[]>([]);
   readonly history = signal<AttendanceRecord[]>([]);
+  readonly students = signal<Student[]>([]);
   readonly qrPayload = signal<QrPayload | null>(null);
 
   qrToken = '';
   studentSessionId: number | null = null;
 
-  readonly historyColumns: TableColumn<AttendanceRecord>[] = [
+  readonly visibleHistory = computed(() => {
+    const user = this.auth.user();
+    return user?.role === 'alumno' && user.profile_id
+      ? this.history().filter((record) => record.student_id === user.profile_id)
+      : this.history();
+  });
+
+  readonly visibleStudents = computed(() => {
+    const user = this.auth.user();
+    return user?.role === 'alumno' && user.profile_id
+      ? this.students().filter((student) => student.id === user.profile_id)
+      : this.students();
+  });
+
+  readonly historyRows = computed<AttendanceHistoryRow[]>(() => this.visibleHistory().map((record) => {
+    const student = this.students().find((item) => item.id === record.student_id);
+    return {
+      ...record,
+      student_name: student?.nombre ?? `Alumno ${record.student_id}`,
+      matricula: student?.matricula ?? '--'
+    };
+  }));
+
+  readonly studentSummaries = computed<StudentAttendanceSummary[]>(() => {
+    const sessionIds = new Set(this.visibleHistory().map((record) => record.session_id));
+    const totalSessions = sessionIds.size;
+    return this.visibleStudents().map((student) => {
+      const records = this.visibleHistory().filter((record) => record.student_id === student.id);
+      const present = records.filter((record) => record.estado === 'Presente').length;
+      const late = records.filter((record) => record.estado === 'Retardo').length;
+      const absences = Math.max(0, totalSessions - present - late);
+      const percentage = totalSessions ? Math.round(((present + late) / totalSessions) * 100) : 0;
+      return { student, present, late, absences, percentage };
+    }).sort((a, b) => a.percentage - b.percentage || a.student.nombre.localeCompare(b.student.nombre, 'es'));
+  });
+
+  readonly historyColumns: TableColumn<AttendanceHistoryRow>[] = [
     { key: 'session_id', header: 'Sesion' },
-    { key: 'student_id', header: 'Alumno ID' },
+    { key: 'matricula', header: 'Matricula' },
+    { key: 'student_name', header: 'Alumno' },
     { key: 'estado', header: 'Estado', badge: (row) => row.estado },
     { key: 'registered_at', header: 'Registrado', formatter: (row) => new Date(row.registered_at).toLocaleString() }
   ];
@@ -290,13 +394,46 @@ export class AttendanceScreen implements OnInit {
     return this.sessions().find((session) => session.status !== 'cerrada') ?? this.sessions()[0];
   }
 
-  presentCount(): number {
-    return this.history().filter((record) => record.estado === 'Presente').length;
+  sessionCount(): number {
+    return new Set(this.visibleHistory().map((record) => record.session_id)).size || this.sessions().length;
+  }
+
+  lateCount(): number {
+    return this.visibleHistory().filter((record) => record.estado === 'Retardo').length;
+  }
+
+  attendanceRate(): number {
+    const summaries = this.studentSummaries();
+    if (!summaries.length) {
+      return 0;
+    }
+    return Math.round(summaries.reduce((sum, item) => sum + item.percentage, 0) / summaries.length);
+  }
+
+  absenceCount(): number {
+    return this.studentSummaries().reduce((sum, item) => sum + item.absences, 0);
+  }
+
+  lowAttendanceCount(): number {
+    return this.studentSummaries().filter((item) => item.percentage < 80).length;
+  }
+
+  isSessionExpired(): boolean {
+    const closesAt = this.activeSession()?.closes_at;
+    return Boolean(closesAt && new Date(closesAt).getTime() <= Date.now());
+  }
+
+  sessionWindowLabel(): string {
+    const closesAt = this.activeSession()?.closes_at;
+    if (!closesAt) {
+      return 'Cierre pendiente';
+    }
+    return `${this.isSessionExpired() ? 'Vencio' : 'Cierra'}: ${closesAt.slice(0, 16)}`;
   }
 
   reload(): void {
     this.loading.set(true);
-    this.periods.listSubjects(undefined, 1, 100).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.subjectScope.listVisibleSubjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (subjects) => {
         this.subjects.set(subjects);
         const initial = this.selectedSubjectId() ?? subjects[0]?.id ?? null;
@@ -322,6 +459,7 @@ export class AttendanceScreen implements OnInit {
     } else {
       this.sessions.set([]);
       this.history.set([]);
+      this.students.set([]);
     }
   }
 
@@ -330,12 +468,25 @@ export class AttendanceScreen implements OnInit {
     this.attendance.attendanceHistory(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (history) => {
         this.history.set(history);
+        this.loadStudents(subjectId, finishLoading);
+      },
+      error: () => {
+        this.history.set([]);
+        this.loadStudents(subjectId, finishLoading);
+      }
+    });
+  }
+
+  private loadStudents(subjectId: number, finishLoading = false): void {
+    this.academics.listStudentsBySubject(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (students) => {
+        this.students.set(students);
         if (finishLoading) {
           this.loading.set(false);
         }
       },
       error: () => {
-        this.history.set([]);
+        this.students.set([]);
         if (finishLoading) {
           this.loading.set(false);
         }

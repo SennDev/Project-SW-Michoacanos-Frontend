@@ -1,19 +1,21 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
+import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { downloadBlob } from '../../core/utils/file-download';
-import { PeriodsService } from '../../services/periods.service';
 import { ReportsService } from '../../services/reports.service';
+import { GradesService } from '../../services/grades.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
 import { Subject } from '../../shared/models/academic.models';
+import { GradeSummary } from '../../shared/models/grade.models';
 import { DownloadHistoryItem, ReportFormat, ReportType, StudentStats, TeacherStats } from '../../shared/models/report.models';
 import { TableColumn } from '../../shared/models/ui.models';
 
@@ -44,7 +46,7 @@ import { TableColumn } from '../../shared/models/ui.models';
           <div class="form-grid">
             <div class="field">
               <label>Materia</label>
-              <select [ngModel]="selectedSubjectId()" (ngModelChange)="selectedSubjectId.set($event)">
+              <select [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
                 <option [ngValue]="null">Selecciona materia</option>
                 @for (subject of subjects(); track subject.id) {
                   <option [ngValue]="subject.id">{{ subject.nrc }} - {{ subject.nombre }}</option>
@@ -62,13 +64,34 @@ import { TableColumn } from '../../shared/models/ui.models';
         </article>
 
         <article class="panel pad" style="grid-column: span 2;">
-          <h2 class="panel-title">Exportar</h2>
+          <h2 class="panel-title">Centro de reportes</h2>
           @if (canExport()) {
-            <div class="row wrap">
-              <button class="btn primary" type="button" [disabled]="exporting()" (click)="export('calificaciones')">Calificaciones</button>
-              <button class="btn primary" type="button" [disabled]="exporting()" (click)="export('asistencias')">Asistencias</button>
+            <div class="report-grid">
+              <article>
+                <span class="status-badge success">Disponible</span>
+                <h3>Promedio del grupo</h3>
+                <p>Concentrado de calificaciones por materia.</p>
+                <button class="btn primary" type="button" [disabled]="exporting()" (click)="export('calificaciones')">Generar</button>
+              </article>
+              <article>
+                <span class="status-badge success">Disponible</span>
+                <h3>Asistencia del grupo</h3>
+                <p>Historial de asistencia por materia.</p>
+                <button class="btn primary" type="button" [disabled]="exporting()" (click)="export('asistencias')">Generar</button>
+              </article>
+              <article>
+                <span class="status-badge warning">Vista previa</span>
+                <h3>Alumnos en riesgo</h3>
+                <p>{{ atRiskStudents().length }} alumnos con promedio menor a 70.</p>
+                <button class="btn ghost" type="button" disabled>Sin exportacion REST</button>
+              </article>
+              <article>
+                <span class="status-badge neutral">Pendiente</span>
+                <h3>Reporte individual</h3>
+                <p>Requiere endpoint dedicado para descarga por alumno.</p>
+                <button class="btn ghost" type="button" disabled>No disponible aun</button>
+              </article>
             </div>
-            <p class="muted" style="margin-top: 12px;">Los archivos se generan en tiempo real desde los microservicios de calificaciones, asistencias, academicos y periodos.</p>
           } @else {
             <agm-empty-state
               title="Exportacion restringida por backend"
@@ -77,6 +100,39 @@ import { TableColumn } from '../../shared/models/ui.models';
           }
         </article>
       </section>
+
+      @if (canExport()) {
+        <section class="grid-2" style="margin-top: 18px;">
+          <article class="panel pad">
+            <h2 class="panel-title">Materia seleccionada</h2>
+            @if (selectedSubject()) {
+              <div class="metric-list">
+                <div class="metric-row"><span>Materia</span><strong>{{ selectedSubject()?.nombre }}</strong></div>
+                <div class="metric-row"><span>Alumnos en riesgo</span><strong>{{ atRiskStudents().length }}</strong></div>
+                <div class="metric-row"><span>Promedio grupal</span><strong>{{ selectedSubjectAverage() }}</strong></div>
+              </div>
+            } @else {
+              <agm-empty-state title="Seleccion pendiente" message="Elige una materia para consultar su resumen." />
+            }
+          </article>
+
+          <article class="panel pad">
+            <h2 class="panel-title">Alumnos en riesgo</h2>
+            @if (atRiskStudents().length) {
+              <div class="metric-list">
+                @for (student of atRiskStudents().slice(0, 5); track student.alumno_id) {
+                  <div class="metric-row">
+                    <span>{{ student.nombre }}</span>
+                    <strong>{{ student.promedio_real.toFixed(1) }}</strong>
+                  </div>
+                }
+              </div>
+            } @else {
+              <agm-empty-state title="Sin alertas" message="No hay alumnos por debajo de 70 en la materia seleccionada." />
+            }
+          </article>
+        </section>
+      }
 
       @if (teacherStats().length || studentStats().length) {
         <section class="grid-2" style="margin-top: 18px;">
@@ -112,13 +168,62 @@ import { TableColumn } from '../../shared/models/ui.models';
         />
       </section>
     }
-  `
+  `,
+  styles: [`
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .report-grid article {
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      min-height: 180px;
+      padding: 16px;
+      border: 1px solid var(--agm-border);
+      border-radius: var(--agm-radius);
+      background: var(--agm-surface-muted);
+    }
+
+    .report-grid h3,
+    .report-grid p {
+      margin: 0;
+    }
+
+    .report-grid h3 {
+      font-size: 1rem;
+    }
+
+    .report-grid p {
+      color: var(--agm-text-soft);
+      line-height: 1.5;
+    }
+
+    .report-grid .btn {
+      margin-top: auto;
+    }
+
+    @media (max-width: 1180px) {
+      .report-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .report-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  `]
 })
 export class ReportsScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
-  private readonly periods = inject(PeriodsService);
+  private readonly subjectScope = inject(SubjectScopeService);
   private readonly reports = inject(ReportsService);
+  private readonly grades = inject(GradesService);
   private readonly toasts = inject(ToastService);
 
   readonly loading = signal(true);
@@ -128,6 +233,7 @@ export class ReportsScreen implements OnInit {
   readonly history = signal<DownloadHistoryItem[]>([]);
   readonly teacherStats = signal<TeacherStats[]>([]);
   readonly studentStats = signal<StudentStats[]>([]);
+  readonly selectedSummary = signal<GradeSummary[]>([]);
 
   format: ReportFormat = 'pdf';
 
@@ -137,6 +243,7 @@ export class ReportsScreen implements OnInit {
     { key: 'format', header: 'Formato', badge: (row) => row.format.toUpperCase() },
     { key: 'createdAt', header: 'Fecha', formatter: (row) => new Date(row.createdAt).toLocaleString() }
   ];
+  readonly atRiskStudents = computed(() => this.selectedSummary().filter((student) => student.promedio_redondeado < 70));
 
   ngOnInit(): void {
     this.history.set(this.reports.history());
@@ -159,12 +266,28 @@ export class ReportsScreen implements OnInit {
     return 'Admin';
   }
 
+  selectedSubject(): Subject | undefined {
+    return this.subjects().find((subject) => subject.id === this.selectedSubjectId());
+  }
+
+  selectedSubjectAverage(): string {
+    const rows = this.selectedSummary();
+    if (!rows.length) {
+      return '--';
+    }
+    return (rows.reduce((sum, row) => sum + row.promedio_real, 0) / rows.length).toFixed(1);
+  }
+
   load(): void {
     this.loading.set(true);
-    this.periods.listSubjects(undefined, 1, 100).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.subjectScope.listVisibleSubjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (subjects) => {
         this.subjects.set(subjects);
-        this.selectedSubjectId.set(this.selectedSubjectId() ?? subjects[0]?.id ?? null);
+        const selected = this.selectedSubjectId() ?? subjects[0]?.id ?? null;
+        this.selectedSubjectId.set(selected);
+        if (selected) {
+          this.loadSelectedSummary(selected);
+        }
         this.loading.set(false);
       },
       error: (error: unknown) => {
@@ -172,6 +295,15 @@ export class ReportsScreen implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  selectSubject(subjectId: number | null): void {
+    this.selectedSubjectId.set(subjectId);
+    if (subjectId) {
+      this.loadSelectedSummary(subjectId);
+    } else {
+      this.selectedSummary.set([]);
+    }
   }
 
   loadRoleStats(): void {
@@ -208,6 +340,13 @@ export class ReportsScreen implements OnInit {
         this.toasts.success('Reporte generado', filename);
       },
       error: (error: unknown) => this.toasts.error('No se genero el reporte', errorMessage(error))
+    });
+  }
+
+  private loadSelectedSummary(subjectId: number): void {
+    this.grades.getConcentrado(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (summary) => this.selectedSummary.set(summary),
+      error: () => this.selectedSummary.set([])
     });
   }
 }

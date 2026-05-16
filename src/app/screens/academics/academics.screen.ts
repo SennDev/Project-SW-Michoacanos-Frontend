@@ -3,10 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, finalize, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
+import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { AcademicsService } from '../../services/academics.service';
-import { PeriodsService } from '../../services/periods.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { FileUploadCardComponent } from '../../shared/components/file-upload-card/file-upload-card.component';
@@ -187,7 +187,7 @@ export class AcademicsScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly academics = inject(AcademicsService);
-  private readonly periods = inject(PeriodsService);
+  private readonly subjectScope = inject(SubjectScopeService);
   private readonly toasts = inject(ToastService);
 
   readonly tab = signal<'teachers' | 'students' | 'subjects'>('teachers');
@@ -233,7 +233,7 @@ export class AcademicsScreen implements OnInit {
     this.error.set('');
     forkJoin({
       teachers: this.auth.role() === 'alumno' ? of([]) : this.academics.listTeachers(),
-      subjects: this.periods.listSubjects(undefined, 1, 100)
+      subjects: this.subjectScope.listVisibleSubjects()
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ teachers, subjects }) => {
         this.teachers.set(teachers);

@@ -218,14 +218,28 @@ import { errorMessage } from '../../core/utils/error.util';
         grid-template-columns: 1fr;
       }
 
+      .auth-card {
+        order: -1;
+      }
+
       .login-story {
         min-height: auto;
+        gap: 22px;
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: clamp(1.9rem, 8vw, 2.6rem);
       }
     }
 
     @media (max-width: 640px) {
       .role-hints {
         grid-template-columns: 1fr;
+      }
+
+      .role-hints article {
+        min-height: auto;
       }
     }
   `]

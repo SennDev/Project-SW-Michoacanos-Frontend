@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
+import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { PeriodsService } from '../../services/periods.service';
@@ -145,6 +146,7 @@ export class PeriodsScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly subjectScope = inject(SubjectScopeService);
   private readonly periodsService = inject(PeriodsService);
   private readonly toasts = inject(ToastService);
 
@@ -201,7 +203,7 @@ export class PeriodsScreen implements OnInit {
   }
 
   loadSubjects(periodId?: number): void {
-    this.periodsService.listSubjects(periodId, 1, 100).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.subjectScope.listVisibleSubjects(periodId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (subjects) => {
         this.subjects.set(subjects);
         this.loading.set(false);
