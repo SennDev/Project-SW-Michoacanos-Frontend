@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light;
+  --agm-bg: #f7f9fc;
+  --agm-surface: #ffffff;
+  --agm-surface-muted: #eef4fb;
+  --agm-surface-raised: #ffffff;
+  --agm-surface-glass: rgba(255, 255, 255, 0.78);
+  --agm-text: #0f172a;
+  --agm-text-soft: #64748b;
+  --agm-border: #d9e2ee;
+  --agm-border-strong: #b8c7da;
+  --agm-primary: #003b70;
+  --agm-primary-strong: #002a50;
+  --agm-primary-soft: #e6f0fb;
+  --agm-secondary: #0057a3;
+  --agm-accent: #f4b400;
+  --agm-accent-soft: #fff5cf;
+  --agm-success: #118a4e;
+  --agm-success-soft: #e7f8ef;
+  --agm-warning: #b77905;
+  --agm-warning-soft: #fff5df;
+  --agm-danger: #c2412d;
+  --agm-danger-soft: #fff0ed;
+  --agm-info: #2563eb;
+  --agm-info-soft: #eaf1ff;
+  --agm-chart-track: #dfe8f3;
+  --agm-shadow: 0 22px 70px rgba(0, 31, 63, 0.12);
+  --agm-shadow-soft: 0 12px 32px rgba(0, 31, 63, 0.08);
+  --agm-shadow-glow: 0 14px 42px rgba(0, 87, 163, 0.18);
+  --agm-sidebar: #001f3f;
+  --agm-sidebar-soft: #003b70;
+  --agm-focus: 0 0 0 3px rgba(0, 87, 163, 0.24);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --agm-bg: #07111f;
+  --agm-surface: #0d1828;
+  --agm-surface-muted: #122235;
+  --agm-surface-raised: #13253b;
+  --agm-surface-glass: rgba(13, 24, 40, 0.82);
+  --agm-text: #f4f8ff;
+  --agm-text-soft: #b7c6dc;
+  --agm-border: #243954;
+  --agm-border-strong: #355173;
+  --agm-primary: #8dc4ff;
+  --agm-primary-strong: #c3e0ff;
+  --agm-primary-soft: #102a46;
+  --agm-secondary: #5eaeff;
+  --agm-accent: #ffd76a;
+  --agm-accent-soft: #3b3015;
+  --agm-success: #54d294;
+  --agm-success-soft: #102e25;
+  --agm-warning: #ffd166;
+  --agm-warning-soft: #32260f;
+  --agm-danger: #ff8e7c;
+  --agm-danger-soft: #341b1b;
+  --agm-info: #8bb8ff;
+  --agm-info-soft: #122543;
+  --agm-chart-track: #1c3049;
+  --agm-shadow: 0 24px 68px rgba(0, 0, 0, 0.42);
+  --agm-shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.32);
+  --agm-shadow-glow: 0 18px 48px rgba(90, 174, 255, 0.12);
+  --agm-sidebar: #030812;
+  --agm-sidebar-soft: #09182b;
+  --agm-focus: 0 0 0 3px rgba(141, 196, 255, 0.32);
+}

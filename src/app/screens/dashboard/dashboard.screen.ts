@@ -1,5 +1,5 @@
 import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
+import { catchError, forkJoin, interval, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -48,7 +48,9 @@ interface TeacherOverview {
       [description]="description()"
     >
       <a class="btn primary" routerLink="/reports">Exportar reportes</a>
-      <a class="btn ghost" routerLink="/system-health">Ver salud</a>
+      @if (isAdmin()) {
+        <a class="btn ghost" routerLink="/system-health">Ver salud</a>
+      }
     </agm-page-header>
 
     @if (loading()) {
@@ -65,10 +67,12 @@ interface TeacherOverview {
             <span>Periodo activo</span>
             <strong>{{ activePeriodName() }}</strong>
           </div>
-          <div>
-            <span>Servicios REST</span>
-            <strong>{{ onlineCount() }}/{{ state().health.length }}</strong>
-          </div>
+          @if (isAdmin()) {
+            <div>
+              <span>Servicios REST</span>
+              <strong>{{ onlineCount() }}/{{ state().health.length }}</strong>
+            </div>
+          }
           <div>
             <span>Materias abiertas</span>
             <strong>{{ openSubjects() }}</strong>
@@ -84,12 +88,18 @@ interface TeacherOverview {
           <agm-kpi-card label="En riesgo" [value]="teacherOverview().atRiskStudents" [tone]="teacherOverview().atRiskStudents ? 'danger' : 'success'" />
           <agm-kpi-card label="Asistencia" [value]="teacherOverview().attendanceRate + '%'" [tone]="teacherOverview().attendanceRate >= 80 ? 'success' : 'warning'" />
         </section>
-      } @else {
+      } @else if (isAdmin()) {
         <section class="grid-4">
           <agm-kpi-card label="Periodos" [value]="state().periods.length" delta="Ciclos registrados" tone="primary" />
           <agm-kpi-card label="Materias" [value]="state().subjects.length" delta="Visibles para tu rol" tone="success" />
           <agm-kpi-card label="Docentes" [value]="state().teachers.length || 'N/D'" delta="Directorio academico" tone="warning" />
           <agm-kpi-card label="Servicios online" [value]="onlineCount()" [delta]="state().health.length + ' servicios monitoreados'" [tone]="onlineCount() === state().health.length ? 'success' : 'danger'" />
+        </section>
+      } @else {
+        <section class="grid-3">
+          <agm-kpi-card label="Materias" [value]="state().subjects.length" delta="Visibles para tu rol" tone="primary" />
+          <agm-kpi-card label="Periodo activo" [value]="activePeriodName()" tone="neutral" />
+          <agm-kpi-card label="Reportes" [value]="state().studentStats.length" delta="Materias con estadisticas" tone="success" />
         </section>
       }
 
@@ -99,11 +109,26 @@ interface TeacherOverview {
           subtitle="Materias por periodo activo o importado"
           [data]="subjectChart()"
         />
-        <agm-chart-card
-          title="Salud de servicios"
-          subtitle="Latencia de health checks locales"
-          [data]="healthChart()"
-        />
+        @if (isAdmin()) {
+          <agm-chart-card
+            title="Salud de servicios"
+            subtitle="Latencia de health checks locales"
+            [data]="healthChart()"
+          />
+        } @else {
+          <article class="panel pad sync-panel">
+            <div class="row between wrap">
+              <div>
+                <h2 class="panel-title">Actualizacion</h2>
+                <p class="muted">El panel se sincroniza automaticamente cada 30 segundos.</p>
+              </div>
+              <span class="sync-line">
+                <span class="sync-dot" aria-hidden="true"></span>
+                {{ lastUpdatedLabel() }}
+              </span>
+            </div>
+          </article>
+        }
       </section>
 
       <section class="grid-3" style="margin-top: 18px;">
@@ -111,7 +136,8 @@ interface TeacherOverview {
           <h2 class="panel-title">Acciones rapidas</h2>
           <div class="quick-actions">
             @for (action of quickActions(); track action.route) {
-              <a [routerLink]="action.route">
+              <a [routerLink]="action.route" [class]="action.tone">
+                <span class="action-code" aria-hidden="true">{{ action.code }}</span>
                 <strong>{{ action.label }}</strong>
                 <span>{{ action.description }}</span>
               </a>
@@ -258,8 +284,9 @@ interface TeacherOverview {
 
     .quick-actions a {
       display: grid;
-      gap: 3px;
-      padding: 12px;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 3px 12px;
+      padding: 14px;
       border: 1px solid var(--agm-border);
       border-radius: var(--agm-radius-sm);
       background: var(--agm-surface-muted);
@@ -272,9 +299,46 @@ interface TeacherOverview {
       box-shadow: var(--agm-shadow-soft);
     }
 
-    .quick-actions span {
+    .quick-actions > a > span:not(.action-code) {
+      grid-column: 2;
       color: var(--agm-text-soft);
       font-size: 0.84rem;
+    }
+
+    .quick-actions strong {
+      align-self: end;
+    }
+
+    .action-code {
+      grid-row: span 2;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--agm-radius-sm);
+      background: color-mix(in srgb, var(--agm-primary) 12%, transparent);
+      color: var(--agm-primary);
+      font-weight: 900;
+    }
+
+    .quick-actions a.warning .action-code {
+      color: var(--agm-warning);
+      background: var(--agm-warning-soft);
+    }
+
+    .quick-actions a.success .action-code {
+      color: var(--agm-success);
+      background: var(--agm-success-soft);
+    }
+
+    .quick-actions a.info .action-code {
+      color: var(--agm-info);
+      background: var(--agm-info-soft);
+    }
+
+    .sync-panel {
+      display: grid;
+      align-content: center;
     }
 
     .teacher-kpis {
@@ -353,6 +417,7 @@ export class DashboardScreen implements OnInit {
     atRiskStudents: 0,
     attendanceRate: 0
   });
+  readonly lastUpdatedAt = signal<Date | null>(null);
 
   readonly title = computed(() => {
     const user = this.auth.user();
@@ -435,6 +500,10 @@ export class DashboardScreen implements OnInit {
     return 'Dashboard admin';
   }
 
+  isAdmin(): boolean {
+    return this.auth.role() === 'admin';
+  }
+
   isTeacher(): boolean {
     return this.auth.role() === 'docente';
   }
@@ -461,31 +530,41 @@ export class DashboardScreen implements OnInit {
     return 'Importaciones, periodos, materias, disponibilidad REST y modulos criticos permanecen visibles para demo y operacion.';
   }
 
-  quickActions(): Array<{ label: string; description: string; route: string }> {
+  lastUpdatedLabel(): string {
+    const value = this.lastUpdatedAt();
+    return value ? `Actualizado ${value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Sincronizando...';
+  }
+
+  quickActions(): Array<{ label: string; description: string; route: string; code: string; tone: 'primary' | 'success' | 'warning' | 'info' }> {
     const role = this.auth.role();
     if (role === 'docente') {
       return [
-        { label: 'Capturar calificaciones', description: 'Ponderaciones, actividades y concentrados', route: '/grades' },
-        { label: 'Abrir asistencia', description: 'Sesion QR con cierre controlado', route: '/attendance' },
-        { label: 'Descargar reportes', description: 'PDF y XLSX por materia', route: '/reports' },
-        { label: 'Gestionar grupos', description: 'Alumnos inscritos y materias', route: '/academics' }
+        { label: 'Capturar calificaciones', description: 'Ponderaciones, actividades y concentrados', route: '/grades', code: 'C', tone: 'primary' },
+        { label: 'Abrir asistencia', description: 'Sesion QR con cierre controlado', route: '/attendance', code: 'Q', tone: 'success' },
+        { label: 'Descargar reportes', description: 'PDF y XLSX por materia', route: '/reports', code: 'R', tone: 'warning' },
+        { label: 'Gestionar grupos', description: 'Alumnos inscritos y materias', route: '/academics', code: 'G', tone: 'info' }
       ];
     }
     if (role === 'alumno') {
       return [
-        { label: 'Ver calificaciones', description: 'Promedios y estado academico', route: '/grades' },
-        { label: 'Generar QR', description: 'Asistencia para una sesion activa', route: '/attendance' },
-        { label: 'Mis reportes', description: 'Descargas disponibles', route: '/reports' }
+        { label: 'Ver calificaciones', description: 'Promedios y estado academico', route: '/grades', code: 'C', tone: 'primary' },
+        { label: 'Generar QR', description: 'Asistencia para una sesion activa', route: '/attendance', code: 'Q', tone: 'success' },
+        { label: 'Mis reportes', description: 'Descargas disponibles', route: '/reports', code: 'R', tone: 'warning' }
       ];
     }
     return [
-      { label: 'Importar docentes', description: 'Directorio PDF', route: '/academics' },
-      { label: 'Importar periodo', description: 'Programacion academica PDF', route: '/periods' },
-      { label: 'Revisar salud', description: 'Todos los microservicios', route: '/system-health' }
+      { label: 'Importar docentes', description: 'Directorio PDF', route: '/academics', code: 'D', tone: 'primary' },
+      { label: 'Importar periodo', description: 'Programacion academica PDF', route: '/periods', code: 'P', tone: 'success' },
+      { label: 'Revisar salud', description: 'Todos los microservicios', route: '/system-health', code: 'S', tone: 'warning' }
     ];
   }
 
   ngOnInit(): void {
+    this.loadDashboard(true);
+    interval(30_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadDashboard(false));
+  }
+
+  private loadDashboard(initialLoad: boolean): void {
     const user = this.auth.user();
     const roleStats$ = user?.role === 'docente' && user.profile_id
       ? this.reports.teacherStats(user.profile_id).pipe(catchError(() => of([])))
@@ -498,7 +577,7 @@ export class DashboardScreen implements OnInit {
       periods: this.periods.listPeriods().pipe(catchError(() => of([]))),
       subjects: this.subjectScope.listVisibleSubjects().pipe(catchError(() => of([]))),
       teachers: this.auth.role() === 'alumno' ? of([]) : this.academics.listTeachers().pipe(catchError(() => of([]))),
-      health: this.health.checkAll(),
+      health: this.isAdmin() ? this.health.checkAll() : of([]),
       teacherStats: roleStats$,
       studentStats: studentStats$
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((state) => {
@@ -506,7 +585,10 @@ export class DashboardScreen implements OnInit {
       if (user?.role === 'docente') {
         this.loadTeacherOverview(state.subjects, state.teacherStats);
       }
-      this.loading.set(false);
+      this.lastUpdatedAt.set(new Date());
+      if (initialLoad) {
+        this.loading.set(false);
+      }
     });
   }
 

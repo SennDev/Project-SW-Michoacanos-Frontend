@@ -1,0 +1,12 @@
+@mixin respond-max($width) {
+  @media (max-width: $width) {
+    @content;
+  }
+}
+
+@mixin interactive-surface {
+  transition:
+    transform var(--agm-duration-fast) ease,
+    box-shadow var(--agm-duration-fast) ease,
+    border-color var(--agm-duration-fast) ease;
+}

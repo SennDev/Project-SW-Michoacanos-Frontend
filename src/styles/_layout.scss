@@ -1,0 +1,101 @@
+@use 'tokens' as *;
+@use 'mixins' as *;
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+
+.app-main {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.content-wrap {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: var(--agm-space-7);
+}
+
+.content-grid,
+.stack {
+  display: grid;
+  gap: var(--agm-space-5);
+}
+
+.grid-2,
+.grid-3,
+.grid-4 {
+  display: grid;
+  gap: var(--agm-space-4);
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+@include respond-max($breakpoint-xl) {
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@include respond-max($breakpoint-lg) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-wrap {
+    padding: var(--agm-space-5);
+  }
+
+  .grid-2,
+  .grid-3,
+  .grid-4,
+  .form-grid.cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@include respond-max($breakpoint-sm) {
+  body {
+    font-size: 14px;
+  }
+
+  .content-wrap {
+    padding: var(--agm-space-4);
+  }
+
+  .row.mobile-stack {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

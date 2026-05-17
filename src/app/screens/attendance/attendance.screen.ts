@@ -1,7 +1,7 @@
-import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnDestroy, ViewChild, computed, inject, OnInit, signal } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { Subscription, finalize, interval } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
 import { SubjectScopeService } from '../../core/services/subject-scope.service';
@@ -31,6 +31,16 @@ interface StudentAttendanceSummary {
   percentage: number;
 }
 
+interface BarcodeDetectorResult {
+  rawValue?: string;
+}
+
+interface BarcodeDetectorLike {
+  detect(source: HTMLVideoElement): Promise<BarcodeDetectorResult[]>;
+}
+
+type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
+
 @Component({
   selector: 'agm-attendance-screen',
   standalone: true,
@@ -56,14 +66,18 @@ interface StudentAttendanceSummary {
 
       <section class="attendance-stage">
         <div>
-          <span class="status-badge" [class]="activeSession() ? 'success' : 'neutral'">
-            {{ activeSession() ? 'Sesion activa' : 'Sin sesion local activa' }}
+          <span class="status-badge" [class]="activeSessionTone()">
+            {{ activeSessionLabel() }}
           </span>
           <h2>{{ activeSession() ? 'Sesion #' + activeSession()?.session_id : 'Control QR listo para iniciar' }}</h2>
           <p>
             El backend mantiene sesiones temporales y tokens firmados. Docentes inician la sesion y registran el token;
             alumnos generan su QR con el ID de sesion activo.
           </p>
+          <span class="sync-line">
+            <span class="sync-dot" aria-hidden="true"></span>
+            {{ syncLabel() }}
+          </span>
         </div>
         <div class="session-display">
           <span>ID de sesion</span>
@@ -109,6 +123,12 @@ interface StudentAttendanceSummary {
                 <textarea rows="4" [(ngModel)]="qrToken" placeholder="Pega aqui el token del alumno"></textarea>
               </div>
               <button class="btn ghost" type="button" [disabled]="registering()" (click)="registerAttendance()">Registrar asistencia</button>
+              <button class="btn ghost" type="button" [disabled]="scannerStarting()" (click)="scannerActive() ? stopScanner() : startScanner()">
+                {{ scannerActive() ? 'Detener camara' : scannerStarting() ? 'Abriendo camara...' : 'Escanear con camara' }}
+              </button>
+              @if (scannerMessage()) {
+                <span class="scanner-message" [class.error]="scannerError()">{{ scannerMessage() }}</span>
+              }
               @if (activeSession()) {
                 <button class="btn danger" type="button" (click)="closeSession(activeSession()!)">Cerrar sesion activa</button>
               }
@@ -150,6 +170,22 @@ interface StudentAttendanceSummary {
           }
         </article>
       </section>
+
+      @if (canManage() && scannerVisible()) {
+        <section class="panel pad scanner-panel" style="margin-top: 18px;">
+          <div class="row between wrap">
+            <div>
+              <h2 class="panel-title">Camara QR</h2>
+              <p class="muted">Acerca el QR del alumno al marco. Tambien puedes seguir usando la captura manual.</p>
+            </div>
+            <button class="btn ghost small" type="button" (click)="stopScanner()">Cerrar</button>
+          </div>
+          <div class="scanner-frame">
+            <video #scannerVideo autoplay muted playsinline aria-label="Vista previa de la camara"></video>
+            <span aria-hidden="true"></span>
+          </div>
+        </section>
+      }
 
       <section class="grid-2" style="margin-top: 18px;">
         <article class="panel pad">
@@ -263,6 +299,48 @@ interface StudentAttendanceSummary {
       line-height: 1.45;
     }
 
+    .scanner-message {
+      color: var(--agm-text-soft);
+      font-size: var(--agm-font-size-sm);
+    }
+
+    .scanner-message.error {
+      color: var(--agm-danger);
+    }
+
+    .scanner-panel {
+      display: grid;
+      gap: 16px;
+    }
+
+    .scanner-panel p {
+      margin: 4px 0 0;
+    }
+
+    .scanner-frame {
+      position: relative;
+      overflow: hidden;
+      min-height: 280px;
+      border: 1px solid var(--agm-border);
+      border-radius: var(--agm-radius);
+      background: #020617;
+    }
+
+    .scanner-frame video {
+      width: 100%;
+      min-height: 280px;
+      max-height: 420px;
+      object-fit: cover;
+    }
+
+    .scanner-frame span {
+      position: absolute;
+      inset: 14%;
+      border: 2px solid rgba(255, 255, 255, 0.86);
+      border-radius: var(--agm-radius);
+      box-shadow: 0 0 0 999px rgba(2, 6, 23, 0.28);
+    }
+
     .qr-card textarea {
       margin-top: 12px;
     }
@@ -308,7 +386,9 @@ interface StudentAttendanceSummary {
     }
   `]
 })
-export class AttendanceScreen implements OnInit {
+export class AttendanceScreen implements OnInit, OnDestroy {
+  @ViewChild('scannerVideo') scannerVideo?: ElementRef<HTMLVideoElement>;
+
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly subjectScope = inject(SubjectScopeService);
@@ -320,6 +400,13 @@ export class AttendanceScreen implements OnInit {
   readonly starting = signal(false);
   readonly registering = signal(false);
   readonly generatingQr = signal(false);
+  readonly syncing = signal(false);
+  readonly lastSyncedAt = signal<Date | null>(null);
+  readonly scannerVisible = signal(false);
+  readonly scannerActive = signal(false);
+  readonly scannerStarting = signal(false);
+  readonly scannerMessage = signal('');
+  readonly scannerError = signal(false);
   readonly subjects = signal<Subject[]>([]);
   readonly selectedSubjectId = signal<number | null>(null);
   readonly sessions = signal<AttendanceSession[]>([]);
@@ -329,6 +416,10 @@ export class AttendanceScreen implements OnInit {
 
   qrToken = '';
   studentSessionId: number | null = null;
+  private pollSubscription?: Subscription;
+  private scannerStream?: MediaStream;
+  private scannerFrameId?: number;
+  private detector?: BarcodeDetectorLike;
 
   readonly visibleHistory = computed(() => {
     const user = this.auth.user();
@@ -378,6 +469,11 @@ export class AttendanceScreen implements OnInit {
     this.reload();
   }
 
+  ngOnDestroy(): void {
+    this.pollSubscription?.unsubscribe();
+    this.stopScanner();
+  }
+
   isStudent(): boolean {
     return this.auth.role() === 'alumno';
   }
@@ -392,6 +488,20 @@ export class AttendanceScreen implements OnInit {
 
   activeSession(): AttendanceSession | undefined {
     return this.sessions().find((session) => session.status !== 'cerrada') ?? this.sessions()[0];
+  }
+
+  activeSessionTone(): 'success' | 'warning' | 'neutral' {
+    if (!this.activeSession()) {
+      return 'neutral';
+    }
+    return this.isSessionExpired() ? 'warning' : 'success';
+  }
+
+  activeSessionLabel(): string {
+    if (!this.activeSession()) {
+      return 'Sin sesion local activa';
+    }
+    return this.isSessionExpired() ? 'Sesion expirada' : 'Sesion activa';
   }
 
   sessionCount(): number {
@@ -431,6 +541,14 @@ export class AttendanceScreen implements OnInit {
     return `${this.isSessionExpired() ? 'Vencio' : 'Cierra'}: ${closesAt.slice(0, 16)}`;
   }
 
+  syncLabel(): string {
+    if (this.syncing()) {
+      return 'Sincronizando asistencia...';
+    }
+    const syncedAt = this.lastSyncedAt();
+    return syncedAt ? `Sincronizado ${syncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Esperando sincronizacion';
+  }
+
   reload(): void {
     this.loading.set(true);
     this.subjectScope.listVisibleSubjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -440,6 +558,7 @@ export class AttendanceScreen implements OnInit {
         this.selectedSubjectId.set(initial);
         if (initial) {
           this.loadAttendance(initial, true);
+          this.startPolling(initial);
         } else {
           this.loading.set(false);
         }
@@ -456,7 +575,9 @@ export class AttendanceScreen implements OnInit {
     this.qrPayload.set(null);
     if (id) {
       this.loadAttendance(id);
+      this.startPolling(id);
     } else {
+      this.pollSubscription?.unsubscribe();
       this.sessions.set([]);
       this.history.set([]);
       this.students.set([]);
@@ -465,15 +586,34 @@ export class AttendanceScreen implements OnInit {
 
   loadAttendance(subjectId: number, finishLoading = false): void {
     this.sessions.set(this.attendance.getLocalSessions(subjectId));
+    this.syncing.set(true);
     this.attendance.attendanceHistory(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (history) => {
         this.history.set(history);
+        this.lastSyncedAt.set(new Date());
+        this.syncing.set(false);
         this.loadStudents(subjectId, finishLoading);
       },
       error: () => {
         this.history.set([]);
+        this.syncing.set(false);
         this.loadStudents(subjectId, finishLoading);
       }
+    });
+  }
+
+  private startPolling(subjectId: number): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = interval(15_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.syncing.set(true);
+      this.attendance.attendanceHistory(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (history) => {
+          this.history.set(history);
+          this.lastSyncedAt.set(new Date());
+          this.syncing.set(false);
+        },
+        error: () => this.syncing.set(false)
+      });
     });
   }
 
@@ -563,5 +703,84 @@ export class AttendanceScreen implements OnInit {
       next: (payload) => this.qrPayload.set(payload),
       error: (error: unknown) => this.toasts.error('No se genero QR', errorMessage(error))
     });
+  }
+
+  async startScanner(): Promise<void> {
+    const Detector = (window as Window & typeof globalThis & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.setScannerMessage('Este navegador no permite abrir la camara.', true);
+      return;
+    }
+    if (!Detector) {
+      this.setScannerMessage('El navegador no soporta lectura QR automatica; usa captura manual.', true);
+      return;
+    }
+
+    this.scannerVisible.set(true);
+    this.scannerStarting.set(true);
+    this.scannerError.set(false);
+    this.scannerMessage.set('Solicitando permiso de camara...');
+
+    try {
+      this.scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const video = this.scannerVideo?.nativeElement;
+      if (!video) {
+        throw new Error('No se encontro la vista previa de la camara.');
+      }
+      video.srcObject = this.scannerStream;
+      await video.play();
+      this.detector = new Detector({ formats: ['qr_code'] });
+      this.scannerActive.set(true);
+      this.setScannerMessage('Camara activa. Escanea un QR valido.', false);
+      this.scanFrame();
+    } catch (error: unknown) {
+      this.setScannerMessage(errorMessage(error, 'No se pudo abrir la camara.'), true);
+      this.stopScanner(false);
+    } finally {
+      this.scannerStarting.set(false);
+    }
+  }
+
+  stopScanner(hide = true): void {
+    if (this.scannerFrameId) {
+      cancelAnimationFrame(this.scannerFrameId);
+      this.scannerFrameId = undefined;
+    }
+    this.scannerStream?.getTracks().forEach((track) => track.stop());
+    this.scannerStream = undefined;
+    this.detector = undefined;
+    this.scannerActive.set(false);
+    if (hide) {
+      this.scannerVisible.set(false);
+    }
+  }
+
+  private scanFrame(): void {
+    const video = this.scannerVideo?.nativeElement;
+    if (!video || !this.detector || !this.scannerActive()) {
+      return;
+    }
+    void this.detector.detect(video).then((codes) => {
+      const token = codes.find((code) => code.rawValue)?.rawValue?.trim();
+      if (token) {
+        this.qrToken = token;
+        this.setScannerMessage('QR detectado. Token listo para registrar.', false);
+        this.stopScanner();
+        return;
+      }
+      this.scannerFrameId = requestAnimationFrame(() => this.scanFrame());
+    }).catch(() => {
+      this.setScannerMessage('No fue posible leer el QR. Intenta acercarlo o usa captura manual.', true);
+      this.scannerFrameId = requestAnimationFrame(() => this.scanFrame());
+    });
+  }
+
+  private setScannerMessage(message: string, error: boolean): void {
+    this.scannerMessage.set(message);
+    this.scannerError.set(error);
   }
 }

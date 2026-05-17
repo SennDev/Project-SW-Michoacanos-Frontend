@@ -128,7 +128,7 @@ export class SearchableTableComponent<T extends object> {
     if (['retardo', 'pendiente', 'degraded'].some((word) => normalized.includes(word))) {
       return 'warning';
     }
-    if (['offline', 'error', 'cerrada', 'baja', 'reprobado'].some((word) => normalized.includes(word))) {
+    if (['offline', 'error', 'cerrada', 'baja', 'reprobado', 'en riesgo'].some((word) => normalized.includes(word))) {
       return 'danger';
     }
     return 'neutral';

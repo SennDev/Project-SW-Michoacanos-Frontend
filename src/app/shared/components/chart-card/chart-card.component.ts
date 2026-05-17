@@ -67,7 +67,7 @@ import { ChartPoint } from '../../models/ui.models';
       height: 11px;
       overflow: hidden;
       border-radius: 999px;
-      background: var(--agm-surface-muted);
+      background: var(--agm-chart-track);
     }
 
     .bar-track span {

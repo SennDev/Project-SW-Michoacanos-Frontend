@@ -77,6 +77,19 @@ docker run --rm -p 8080:8080 agm-frontend
 
 The included `nginx.conf` handles SPA fallback to `index.html`.
 
+When this repository lives next to the backend repository as:
+
+```text
+Project-SW-Michoacanos
+Project-SW-Michoacanos-Frontend
+```
+
+the backend `docker-compose.yml` also builds this frontend automatically, so one command from the backend repository starts the complete platform:
+
+```powershell
+docker compose up --build
+```
+
 ## Configuration
 
 API URLs live in:

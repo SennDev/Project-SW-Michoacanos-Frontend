@@ -5,7 +5,16 @@ import { map, Observable, tap } from 'rxjs';
 import { API_CONFIG } from '../tokens/api-config.token';
 import { TokenService } from './token.service';
 import { ApiResponse } from '../../shared/models/api.models';
-import { AuthUser, LoginRequest, StoredSession, TokenResponse, UserRole } from '../../shared/models/auth.models';
+import {
+  AuthUser,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  LoginRequest,
+  ResetPasswordRequest,
+  StoredSession,
+  TokenResponse,
+  UserRole
+} from '../../shared/models/auth.models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -46,6 +55,18 @@ export class AuthService {
           }
         })
       );
+  }
+
+  forgotPassword(payload: ForgotPasswordRequest): Observable<ForgotPasswordResponse | null> {
+    return this.http
+      .post<ApiResponse<ForgotPasswordResponse | null>>(`${this.apiConfig.auth}/auth/forgot-password`, payload)
+      .pipe(map((response) => response.data));
+  }
+
+  resetPassword(payload: ResetPasswordRequest): Observable<null> {
+    return this.http
+      .post<ApiResponse<null>>(`${this.apiConfig.auth}/auth/reset-password`, payload)
+      .pipe(map((response) => response.data));
   }
 
   logout(redirect = true): void {

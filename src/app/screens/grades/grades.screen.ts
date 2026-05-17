@@ -203,6 +203,16 @@ interface WeightDraft {
             </div>
           </div>
 
+          <div class="capture-status">
+            <span class="sync-line">
+              <span class="sync-dot" aria-hidden="true"></span>
+              {{ saveStatusLabel() }}
+            </span>
+            @if (pendingDraftCount()) {
+              <span class="status-badge warning">{{ pendingDraftCount() }} pendientes</span>
+            }
+          </div>
+
           @if (selectedActivity() && students().length) {
             <div class="capture-grid">
               @for (student of students(); track student.id) {
@@ -338,6 +348,14 @@ interface WeightDraft {
       margin-top: 16px;
     }
 
+    .capture-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
     .capture-grid article {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto 110px auto;
@@ -407,6 +425,11 @@ interface WeightDraft {
       .capture-stats {
         text-align: left;
       }
+
+      .capture-status {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   `]
 })
@@ -432,6 +455,7 @@ export class GradesScreen implements OnInit {
   readonly draftScores = signal<Record<number, number | null>>({});
   readonly savingStudentIds = signal<number[]>([]);
   readonly savingBatch = signal(false);
+  readonly lastSavedAt = signal<Date | null>(null);
 
   activityCategoryId: number | null = null;
   activityName = '';
@@ -672,6 +696,20 @@ export class GradesScreen implements OnInit {
     return Object.values(this.draftScores()).some((score) => typeof score === 'number');
   }
 
+  pendingDraftCount(): number {
+    return Object.values(this.draftScores()).filter((score) => typeof score === 'number').length;
+  }
+
+  saveStatusLabel(): string {
+    if (this.savingBatch() || this.savingStudentIds().length) {
+      return 'Guardando cambios...';
+    }
+    const lastSavedAt = this.lastSavedAt();
+    return lastSavedAt
+      ? `Guardado ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : 'Sin cambios pendientes';
+  }
+
   savingStudent(studentId: number): boolean {
     return this.savingStudentIds().includes(studentId);
   }
@@ -695,6 +733,7 @@ export class GradesScreen implements OnInit {
     ).subscribe({
       next: () => {
         this.toasts.success('Calificacion guardada');
+        this.lastSavedAt.set(new Date());
         this.loadSubjectData(subjectId);
       },
       error: (error: unknown) => this.toasts.error('No se guardo la calificacion', errorMessage(error))
@@ -722,6 +761,7 @@ export class GradesScreen implements OnInit {
     ).subscribe({
       next: () => {
         this.toasts.success('Captura guardada', `${payloads.length} calificaciones actualizadas`);
+        this.lastSavedAt.set(new Date());
         this.loadSubjectData(subjectId);
       },
       error: (error: unknown) => this.toasts.error('No se guardo la captura', errorMessage(error))

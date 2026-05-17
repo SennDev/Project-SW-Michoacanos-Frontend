@@ -1,0 +1,50 @@
+.mt-section {
+  margin-top: 18px;
+}
+
+.glass {
+  background: var(--agm-surface-glass);
+  backdrop-filter: blur(18px);
+}
+
+.sync-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--agm-text-soft);
+  font-size: var(--agm-font-size-sm);
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--agm-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--agm-success) 32%, transparent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--agm-success) 32%, transparent);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

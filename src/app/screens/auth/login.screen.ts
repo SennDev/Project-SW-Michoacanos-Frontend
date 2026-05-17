@@ -63,6 +63,8 @@ import { errorMessage } from '../../core/utils/error.util';
             }
           </div>
 
+          <a class="forgot-link" routerLink="/auth/recover">Olvide mi contrasena</a>
+
           @if (error()) {
             <div class="login-error" role="alert">{{ error() }}</div>
           }
@@ -199,6 +201,12 @@ import { errorMessage } from '../../core/utils/error.util';
       color: var(--agm-danger);
       background: color-mix(in srgb, var(--agm-danger) 8%, transparent);
       font-weight: 700;
+    }
+
+    .forgot-link {
+      justify-self: start;
+      color: var(--agm-primary);
+      font-weight: 800;
     }
 
     .auth-foot {

@@ -18,6 +18,14 @@ export const routes: Routes = [
     loadComponent: () => import('./screens/auth/login.screen').then((m) => m.LoginScreen)
   },
   {
+    path: 'auth/recover',
+    loadComponent: () => import('./screens/auth/recover-password.screen').then((m) => m.RecoverPasswordScreen)
+  },
+  {
+    path: 'auth/reset',
+    loadComponent: () => import('./screens/auth/reset-password.screen').then((m) => m.ResetPasswordScreen)
+  },
+  {
     path: '',
     component: AppShellComponent,
     canActivate: [authGuard],

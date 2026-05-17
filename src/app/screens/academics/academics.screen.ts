@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, finalize, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -7,6 +7,8 @@ import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { AcademicsService } from '../../services/academics.service';
+import { GradesService } from '../../services/grades.service';
+import { AttendanceService } from '../../services/attendance.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { FileUploadCardComponent } from '../../shared/components/file-upload-card/file-upload-card.component';
@@ -16,6 +18,15 @@ import { ErrorStateComponent } from '../../shared/components/error-state/error-s
 import { ConfirmationModalComponent } from '../../shared/components/confirmation-modal/confirmation-modal.component';
 import { Student, Subject, Teacher } from '../../shared/models/academic.models';
 import { TableColumn } from '../../shared/models/ui.models';
+import { GradeSummary } from '../../shared/models/grade.models';
+import { AttendanceRecord } from '../../shared/models/attendance.models';
+
+interface StudentRosterRow extends Student {
+  promedio: number | null;
+  asistencia: number | null;
+  faltas: number;
+  riesgo: string;
+}
 
 @Component({
   selector: 'agm-academics-screen',
@@ -47,7 +58,9 @@ import { TableColumn } from '../../shared/models/ui.models';
       <agm-loading-skeleton [rows]="6" />
     } @else {
       <section class="section-tabs" aria-label="Vistas academicas">
-        <button type="button" [class.active]="tab() === 'teachers'" (click)="tab.set('teachers')">Docentes</button>
+        @if (isAdmin()) {
+          <button type="button" [class.active]="tab() === 'teachers'" (click)="tab.set('teachers')">Docentes</button>
+        }
         <button type="button" [class.active]="tab() === 'students'" (click)="tab.set('students')">Alumnos</button>
         <button type="button" [class.active]="tab() === 'subjects'" (click)="tab.set('subjects')">Materias</button>
       </section>
@@ -112,14 +125,25 @@ import { TableColumn } from '../../shared/models/ui.models';
             <div class="metric-list">
               <div class="metric-row"><span>Materias</span><strong>{{ subjects().length }}</strong></div>
               <div class="metric-row"><span>Alumnos activos</span><strong>{{ students().length }}</strong></div>
-              <div class="metric-row"><span>Docentes</span><strong>{{ teachers().length }}</strong></div>
+              <div class="metric-row"><span>En riesgo</span><strong>{{ atRiskCount() }}</strong></div>
             </div>
           </article>
         </section>
 
         <section style="margin-top: 18px;">
+          <div class="row between wrap roster-toolbar">
+            <div>
+              <h2 class="panel-title">Alumnos del grupo</h2>
+              <p class="muted">{{ selectedSubject()?.nombre || 'Selecciona una materia' }}</p>
+            </div>
+            <div class="section-tabs" aria-label="Filtrar alumnos">
+              <button type="button" [class.active]="rosterFilter() === 'all'" (click)="rosterFilter.set('all')">Todos</button>
+              <button type="button" [class.active]="rosterFilter() === 'risk'" (click)="rosterFilter.set('risk')">En riesgo</button>
+              <button type="button" [class.active]="rosterFilter() === 'attendance'" (click)="rosterFilter.set('attendance')">Baja asistencia</button>
+            </div>
+          </div>
           <agm-searchable-table
-            [rows]="students()"
+            [rows]="visibleRosterRows()"
             [columns]="studentColumns"
             [actions]="isAdmin() ? studentActions : null"
             placeholder="Buscar alumno, matricula o correo"
@@ -181,12 +205,22 @@ import { TableColumn } from '../../shared/models/ui.models';
     .subject-card small {
       color: var(--agm-text-soft);
     }
+
+    .roster-toolbar {
+      margin-bottom: 12px;
+    }
+
+    .roster-toolbar p {
+      margin: 4px 0 0;
+    }
   `]
 })
 export class AcademicsScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly academics = inject(AcademicsService);
+  private readonly grades = inject(GradesService);
+  private readonly attendance = inject(AttendanceService);
   private readonly subjectScope = inject(SubjectScopeService);
   private readonly toasts = inject(ToastService);
 
@@ -198,6 +232,9 @@ export class AcademicsScreen implements OnInit {
   readonly teachers = signal<Teacher[]>([]);
   readonly subjects = signal<Subject[]>([]);
   readonly students = signal<Student[]>([]);
+  readonly gradeSummary = signal<GradeSummary[]>([]);
+  readonly attendanceHistory = signal<AttendanceRecord[]>([]);
+  readonly rosterFilter = signal<'all' | 'risk' | 'attendance'>('all');
   readonly selectedSubjectId = signal<number | null>(null);
   readonly studentToWithdraw = signal<Student | null>(null);
 
@@ -208,15 +245,54 @@ export class AcademicsScreen implements OnInit {
     { key: 'extension', header: 'Extension' }
   ];
 
-  readonly studentColumns: TableColumn<Student>[] = [
+  readonly studentRows = computed<StudentRosterRow[]>(() => {
+    const sessionCount = new Set(this.attendanceHistory().map((record) => record.session_id)).size;
+    return this.students().map((student) => {
+      const summary = this.gradeSummary().find((row) => row.alumno_id === student.id);
+      const records = this.attendanceHistory().filter((record) => record.student_id === student.id);
+      const presentOrLate = records.filter((record) => record.estado === 'Presente' || record.estado === 'Retardo').length;
+      const asistencia = sessionCount ? Math.round((presentOrLate / sessionCount) * 100) : null;
+      const faltas = sessionCount ? Math.max(0, sessionCount - presentOrLate) : 0;
+      const lowGrade = Boolean(summary && summary.promedio_redondeado < 70);
+      const lowAttendance = Boolean(asistencia !== null && asistencia < 80);
+      return {
+        ...student,
+        promedio: summary?.promedio_real ?? null,
+        asistencia,
+        faltas,
+        riesgo: lowGrade || lowAttendance ? 'En riesgo' : 'Estable'
+      };
+    });
+  });
+
+  readonly visibleRosterRows = computed(() => {
+    const filter = this.rosterFilter();
+    if (filter === 'risk') {
+      return this.studentRows().filter((student) => student.riesgo === 'En riesgo');
+    }
+    if (filter === 'attendance') {
+      return this.studentRows().filter((student) => student.asistencia !== null && student.asistencia < 80);
+    }
+    return this.studentRows();
+  });
+
+  readonly atRiskCount = computed(() => this.studentRows().filter((student) => student.riesgo === 'En riesgo').length);
+
+  readonly studentColumns: TableColumn<StudentRosterRow>[] = [
     { key: 'matricula', header: 'Matricula' },
     { key: 'nombre', header: 'Nombre' },
     { key: 'email', header: 'Correo' },
-    { key: 'nivel', header: 'Nivel' },
+    { key: 'promedio', header: 'Promedio', formatter: (row) => row.promedio === null ? '--' : row.promedio.toFixed(1) },
+    { key: 'asistencia', header: 'Asistencia', formatter: (row) => row.asistencia === null ? '--' : `${row.asistencia}%` },
+    { key: 'faltas', header: 'Faltas' },
+    { key: 'riesgo', header: 'Seguimiento', badge: (row) => row.riesgo },
     { key: 'status', header: 'Estado', badge: (row) => row.activo === false ? 'Baja' : row.status }
   ];
 
   ngOnInit(): void {
+    if (!this.isAdmin()) {
+      this.tab.set('students');
+    }
     this.load();
   }
 
@@ -232,7 +308,7 @@ export class AcademicsScreen implements OnInit {
     this.loading.set(true);
     this.error.set('');
     forkJoin({
-      teachers: this.auth.role() === 'alumno' ? of([]) : this.academics.listTeachers(),
+      teachers: this.isAdmin() ? this.academics.listTeachers() : of([]),
       subjects: this.subjectScope.listVisibleSubjects()
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ teachers, subjects }) => {
@@ -258,13 +334,27 @@ export class AcademicsScreen implements OnInit {
       this.loadStudents(id);
     } else {
       this.students.set([]);
+      this.gradeSummary.set([]);
+      this.attendanceHistory.set([]);
     }
   }
 
   loadStudents(subjectId: number): void {
-    this.academics.listStudentsBySubject(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (students) => this.students.set(students),
-      error: () => this.students.set([])
+    forkJoin({
+      students: this.academics.listStudentsBySubject(subjectId),
+      summary: this.grades.getConcentrado(subjectId),
+      attendance: this.attendance.attendanceHistory(subjectId)
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ students, summary, attendance }) => {
+        this.students.set(students);
+        this.gradeSummary.set(summary);
+        this.attendanceHistory.set(attendance);
+      },
+      error: () => {
+        this.students.set([]);
+        this.gradeSummary.set([]);
+        this.attendanceHistory.set([]);
+      }
     });
   }
 
