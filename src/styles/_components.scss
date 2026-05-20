@@ -1,7 +1,7 @@
 @use 'mixins' as *;
 
 .panel {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--agm-surface) 94%, transparent), var(--agm-surface));
+  background: var(--agm-panel-bg);
   border: 1px solid var(--agm-border);
   border-radius: var(--agm-radius);
   box-shadow: var(--agm-shadow-soft);
@@ -132,6 +132,11 @@
   border-color: var(--agm-border);
 }
 
+.btn.ghost:hover:not(:disabled) {
+  border-color: var(--agm-border-strong);
+  background: color-mix(in srgb, var(--agm-surface-raised) 78%, transparent);
+}
+
 .btn.danger {
   color: white;
   background: var(--agm-danger);
@@ -192,7 +197,11 @@ th {
 }
 
 tbody tr:hover {
-  background: color-mix(in srgb, var(--agm-primary) 5%, transparent);
+  background: var(--agm-table-hover);
+}
+
+tbody tr:focus-within {
+  background: color-mix(in srgb, var(--agm-primary) 10%, transparent);
 }
 
 .status-badge {

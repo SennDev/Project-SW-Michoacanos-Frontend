@@ -1,5 +1,5 @@
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
@@ -16,6 +16,23 @@ import { ErrorStateComponent } from '../../shared/components/error-state/error-s
 import { ConfirmationModalComponent } from '../../shared/components/confirmation-modal/confirmation-modal.component';
 import { Period, Subject } from '../../shared/models/academic.models';
 import { TableColumn } from '../../shared/models/ui.models';
+
+const STUDY_PLANS = [
+  'Ingenieria en Ciencias de la Computacion',
+  'Licenciatura en Ciencias de la Computacion',
+  'Ingenieria en Tecnologias de la Informacion'
+];
+
+function periodDateValidator(control: AbstractControl): ValidationErrors | null {
+  const start = control.get('fecha_inicio')?.value as string | null;
+  const end = control.get('fecha_fin')?.value as string | null;
+
+  if (!start || !end) {
+    return null;
+  }
+
+  return start <= end ? null : { dateRange: true };
+}
 
 @Component({
   selector: 'agm-periods-screen',
@@ -71,32 +88,52 @@ import { TableColumn } from '../../shared/models/ui.models';
         @if (isAdmin()) {
           <aside class="panel pad">
             <h2 class="panel-title">{{ editingId() ? 'Editar periodo' : 'Crear periodo' }}</h2>
-            <form class="form-grid" [formGroup]="form" (ngSubmit)="save()">
+            <form class="form-grid" [formGroup]="form" (ngSubmit)="save()" novalidate>
               <div class="field">
-                <label>Nombre</label>
-                <input formControlName="nombre" placeholder="Primavera 2026">
+                <label for="period-name">Nombre</label>
+                <input id="period-name" formControlName="nombre" placeholder="Primavera 2026" [attr.aria-invalid]="showControlError('nombre')">
+                @if (showControlError('nombre')) {
+                  <span class="field-error">El nombre del periodo es obligatorio.</span>
+                }
               </div>
               <div class="form-grid cols-2">
                 <div class="field">
-                  <label>Inicio</label>
-                  <input formControlName="fecha_inicio" placeholder="2026-01-08">
+                  <label for="period-start">Inicio de cursos</label>
+                  <input id="period-start" type="date" formControlName="fecha_inicio" [attr.aria-invalid]="showControlError('fecha_inicio') || hasDateRangeError()">
+                  @if (showControlError('fecha_inicio')) {
+                    <span class="field-error">Selecciona la fecha de inicio.</span>
+                  }
                 </div>
                 <div class="field">
-                  <label>Fin</label>
-                  <input formControlName="fecha_fin" placeholder="2026-05-30">
+                  <label for="period-end">Fin de cursos</label>
+                  <input id="period-end" type="date" formControlName="fecha_fin" [attr.aria-invalid]="showControlError('fecha_fin') || hasDateRangeError()">
+                  @if (showControlError('fecha_fin')) {
+                    <span class="field-error">Selecciona la fecha de cierre.</span>
+                  }
                 </div>
               </div>
+              @if (hasDateRangeError()) {
+                <span class="field-error">La fecha de inicio no puede ser posterior a la fecha de fin.</span>
+              }
               <div class="field">
-                <label>Plan de estudios</label>
-                <input formControlName="plan_estudios" placeholder="Ingenieria en Tecnologias de la Informacion">
+                <label for="period-plan">Plan de estudios</label>
+                <select id="period-plan" formControlName="plan_estudios" [attr.aria-invalid]="showControlError('plan_estudios')">
+                  <option value="">Selecciona carrera</option>
+                  @for (plan of studyPlans; track plan) {
+                    <option [value]="plan">{{ plan }}</option>
+                  }
+                </select>
+                @if (showControlError('plan_estudios')) {
+                  <span class="field-error">Selecciona una carrera valida.</span>
+                }
               </div>
-              <label class="row">
-                <input type="checkbox" formControlName="activo">
-                <span>Marcar como periodo activo</span>
-              </label>
+              <p class="form-note">AGM conserva el estado activo desde el backend; esta pantalla ya no fuerza cambios manuales de periodo activo.</p>
               <button class="btn primary" type="submit" [disabled]="form.invalid || saving()">
-                {{ saving() ? 'Guardando...' : 'Guardar periodo' }}
+                {{ saveButtonLabel() }}
               </button>
+              @if (saveMessage()) {
+                <span class="save-feedback" [class.error]="saveStatus() === 'error'">{{ saveMessage() }}</span>
+              }
             </form>
           </aside>
         }
@@ -106,7 +143,7 @@ import { TableColumn } from '../../shared/models/ui.models';
         @if (isAdmin()) {
           <agm-file-upload-card
             title="Importar programacion PDF"
-            hint="Usa el endpoint /periodos/importar con archivo PDF real. Si seleccionas un periodo activo, se agregaran materias ahi."
+            hint="Usa el endpoint /periodos/importar con archivo PDF real. AGM usa el periodo vigente que devuelve el backend."
             accept=".pdf"
             actionLabel="Importar PDF"
             [loading]="importing()"
@@ -121,7 +158,12 @@ import { TableColumn } from '../../shared/models/ui.models';
               @for (subject of subjects().slice(0, 8); track subject.id) {
                 <div class="metric-row">
                   <span>{{ subject.nrc }} - {{ subject.nombre }}</span>
-                  <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+                  <span class="row">
+                    <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+                    @if (isStudent()) {
+                      <button class="btn ghost small" type="button" (click)="askSubjectWithdrawal(subject)">Solicitar baja</button>
+                    }
+                  </span>
                 </div>
               }
             </div>
@@ -140,7 +182,48 @@ import { TableColumn } from '../../shared/models/ui.models';
       (confirm)="deletePeriod()"
       (cancel)="periodToDelete.set(null)"
     />
-  `
+
+    <agm-confirmation-modal
+      [open]="Boolean(subjectWithdrawal())"
+      title="Solicitud de baja"
+      [message]="'Para baja de ' + (subjectWithdrawal()?.nombre || 'esta materia') + ', AGM requiere aprobacion administrativa. El backend actual no expone todavia un endpoint de solicitud, por lo que no se elimina tu acceso desde esta pantalla.'"
+      confirmLabel="Entendido"
+      (confirm)="subjectWithdrawal.set(null)"
+      (cancel)="subjectWithdrawal.set(null)"
+    />
+  `,
+  styles: [`
+    .form-note,
+    .save-feedback {
+      color: var(--agm-text-soft);
+      font-size: var(--agm-font-size-sm);
+      line-height: 1.5;
+    }
+
+    .save-feedback {
+      color: var(--agm-success);
+      font-weight: 800;
+    }
+
+    .save-feedback.error {
+      color: var(--agm-danger);
+    }
+
+    .metric-row .row {
+      justify-content: end;
+      gap: 8px;
+    }
+
+    @media (max-width: 720px) {
+      article[style*="grid-column"] {
+        grid-column: auto !important;
+      }
+
+      .metric-row .row {
+        justify-content: start;
+      }
+    }
+  `]
 })
 export class PeriodsScreen implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
@@ -158,6 +241,10 @@ export class PeriodsScreen implements OnInit {
   readonly subjects = signal<Subject[]>([]);
   readonly editingId = signal<number | null>(null);
   readonly periodToDelete = signal<Period | null>(null);
+  readonly subjectWithdrawal = signal<Subject | null>(null);
+  readonly saveStatus = signal<'idle' | 'success' | 'error'>('idle');
+  readonly saveMessage = signal('');
+  readonly studyPlans = STUDY_PLANS;
 
   readonly periodColumns: TableColumn<Period>[] = [
     { key: 'nombre', header: 'Periodo' },
@@ -171,9 +258,8 @@ export class PeriodsScreen implements OnInit {
     nombre: ['', Validators.required],
     fecha_inicio: ['', Validators.required],
     fecha_fin: ['', Validators.required],
-    plan_estudios: ['', Validators.required],
-    activo: [false]
-  });
+    plan_estudios: ['', Validators.required]
+  }, { validators: periodDateValidator });
 
   ngOnInit(): void {
     this.load();
@@ -181,6 +267,10 @@ export class PeriodsScreen implements OnInit {
 
   isAdmin(): boolean {
     return this.auth.role() === 'admin';
+  }
+
+  isStudent(): boolean {
+    return this.auth.role() === 'alumno';
   }
 
   periodRows(): Period[] {
@@ -217,12 +307,13 @@ export class PeriodsScreen implements OnInit {
 
   resetForm(): void {
     this.editingId.set(null);
+    this.saveStatus.set('idle');
+    this.saveMessage.set('');
     this.form.reset({
       nombre: '',
       fecha_inicio: '',
       fecha_fin: '',
-      plan_estudios: '',
-      activo: false
+      plan_estudios: ''
     });
   }
 
@@ -230,10 +321,9 @@ export class PeriodsScreen implements OnInit {
     this.editingId.set(period.id);
     this.form.setValue({
       nombre: period.nombre,
-      fecha_inicio: period.fecha_inicio,
-      fecha_fin: period.fecha_fin,
-      plan_estudios: period.plan_estudios,
-      activo: period.activo
+      fecha_inicio: this.toDateInput(period.fecha_inicio),
+      fecha_fin: this.toDateInput(period.fecha_fin),
+      plan_estudios: this.studyPlans.includes(period.plan_estudios) ? period.plan_estudios : ''
     });
   }
 
@@ -243,17 +333,32 @@ export class PeriodsScreen implements OnInit {
       return;
     }
     this.saving.set(true);
+    this.saveStatus.set('idle');
+    this.saveMessage.set('');
+    const existingPeriod = this.periods().find((period) => period.id === this.editingId());
+    const payload = {
+      ...this.form.getRawValue(),
+      activo: existingPeriod?.activo ?? true
+    };
     const request = this.editingId()
-      ? this.periodsService.updatePeriod(this.editingId()!, this.form.getRawValue())
-      : this.periodsService.createPeriod(this.form.getRawValue());
+      ? this.periodsService.updatePeriod(this.editingId()!, payload)
+      : this.periodsService.createPeriod(payload);
 
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.toasts.success('Periodo guardado');
+        const message = this.editingId() ? 'Cambios del periodo guardados' : 'Periodo creado correctamente';
+        this.toasts.success(message);
         this.resetForm();
+        this.saveStatus.set('success');
+        this.saveMessage.set(message);
         this.load();
       },
-      error: (error: unknown) => this.toasts.error('No se guardo el periodo', errorMessage(error))
+      error: (error: unknown) => {
+        const message = errorMessage(error);
+        this.saveStatus.set('error');
+        this.saveMessage.set(message);
+        this.toasts.error('No se guardo el periodo', message);
+      }
     });
   }
 
@@ -276,6 +381,10 @@ export class PeriodsScreen implements OnInit {
     this.periodToDelete.set(period);
   }
 
+  askSubjectWithdrawal(subject: Subject): void {
+    this.subjectWithdrawal.set(subject);
+  }
+
   deletePeriod(): void {
     const period = this.periodToDelete();
     if (!period) {
@@ -292,4 +401,24 @@ export class PeriodsScreen implements OnInit {
   }
 
   protected readonly Boolean = Boolean;
+
+  showControlError(controlName: 'nombre' | 'fecha_inicio' | 'fecha_fin' | 'plan_estudios'): boolean {
+    const control = this.form.controls[controlName];
+    return Boolean(control.touched && control.invalid);
+  }
+
+  hasDateRangeError(): boolean {
+    return Boolean(this.form.touched && this.form.hasError('dateRange'));
+  }
+
+  saveButtonLabel(): string {
+    if (this.saving()) {
+      return this.editingId() ? 'Guardando cambios...' : 'Creando periodo...';
+    }
+    return this.editingId() ? 'Guardar cambios' : 'Crear periodo';
+  }
+
+  private toDateInput(value: string): string {
+    return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
+  }
 }

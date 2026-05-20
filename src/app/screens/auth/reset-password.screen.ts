@@ -25,23 +25,30 @@ import { errorMessage } from '../../core/utils/error.util';
           <div>
             <p class="section-kicker">Restablecer acceso</p>
             <h1>Define tu nueva contrasena.</h1>
-            <p class="muted">El token debe seguir vigente y no haber sido usado antes.</p>
+            <p class="muted">El token debe seguir vigente y no haber sido usado antes. AGM no lo guarda en almacenamiento local.</p>
           </div>
 
           <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()">
-            <div class="field">
-              <label for="token">Token de recuperacion</label>
-              <input id="token" formControlName="token" autocomplete="one-time-code">
-              @if (form.controls.token.touched && form.controls.token.invalid) {
-                <span class="field-error">Ingresa el token recibido.</span>
-              }
-            </div>
+            @if (secureLinkToken()) {
+              <div class="security-note" role="status">
+                <strong>Token de enlace detectado</strong>
+                <span>Se oculto del formulario y se retiro de la URL para reducir exposicion.</span>
+              </div>
+            } @else {
+              <div class="field">
+                <label for="token">Token de recuperacion</label>
+                <input id="token" formControlName="token" autocomplete="one-time-code" spellcheck="false">
+                @if (form.controls.token.touched && form.controls.token.invalid) {
+                  <span class="field-error">Ingresa el token recibido.</span>
+                }
+              </div>
+            }
 
             <div class="field">
               <label for="new-password">Nueva contrasena</label>
               <input id="new-password" type="password" autocomplete="new-password" formControlName="new_password">
               @if (form.controls.new_password.touched && form.controls.new_password.invalid) {
-                <span class="field-error">Debe tener al menos 6 caracteres.</span>
+                <span class="field-error">Usa al menos 8 caracteres e incluye letras y numeros.</span>
               }
             </div>
 
@@ -98,7 +105,8 @@ import { errorMessage } from '../../core/utils/error.util';
     }
 
     .login-error,
-    .success-panel {
+    .success-panel,
+    .security-note {
       display: grid;
       gap: 8px;
       padding: 14px;
@@ -112,12 +120,14 @@ import { errorMessage } from '../../core/utils/error.util';
       font-weight: 700;
     }
 
-    .success-panel {
+    .success-panel,
+    .security-note {
       border: 1px solid color-mix(in srgb, var(--agm-success) 30%, var(--agm-border));
       background: var(--agm-success-soft);
     }
 
-    .success-panel span {
+    .success-panel span,
+    .security-note span {
       color: var(--agm-text-soft);
     }
   `]
@@ -132,17 +142,24 @@ export class ResetPasswordScreen implements OnInit {
   readonly loading = signal(false);
   readonly success = signal(false);
   readonly error = signal('');
+  readonly secureLinkToken = signal('');
 
   readonly form = this.fb.nonNullable.group({
     token: ['', Validators.required],
-    new_password: ['', [Validators.required, Validators.minLength(6)]],
-    confirm_password: ['', [Validators.required, Validators.minLength(6)]]
+    new_password: ['', [Validators.required, Validators.minLength(8), Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)]],
+    confirm_password: ['', [Validators.required, Validators.minLength(8)]]
   });
 
   ngOnInit(): void {
     const token = this.route.snapshot.queryParamMap.get('token');
     if (token) {
-      this.form.controls.token.setValue(token);
+      this.secureLinkToken.set(token);
+      this.form.controls.token.clearValidators();
+      this.form.controls.token.setValue('');
+      this.form.controls.token.updateValueAndValidity();
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, document.title, '/auth/reset');
+      }
     }
   }
 
@@ -157,7 +174,8 @@ export class ResetPasswordScreen implements OnInit {
       return;
     }
 
-    const { token, new_password } = this.form.getRawValue();
+    const { new_password } = this.form.getRawValue();
+    const token = this.secureLinkToken() || this.form.controls.token.value.trim();
     this.loading.set(true);
     this.error.set('');
     this.auth.resetPassword({ token, new_password }).pipe(
@@ -165,6 +183,8 @@ export class ResetPasswordScreen implements OnInit {
     ).subscribe({
       next: () => {
         this.success.set(true);
+        this.secureLinkToken.set('');
+        this.form.reset();
         this.toasts.success('Contrasena actualizada');
       },
       error: (error: unknown) => this.error.set(errorMessage(error, 'No fue posible actualizar la contrasena.'))

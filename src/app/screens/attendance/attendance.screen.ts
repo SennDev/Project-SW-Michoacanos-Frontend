@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, OnDestroy, ViewChild, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnDestroy, ViewChild, computed, inject, OnInit, signal } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, finalize, interval } from 'rxjs';
@@ -122,7 +122,9 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
                 <label>Token QR escaneado</label>
                 <textarea rows="4" [(ngModel)]="qrToken" placeholder="Pega aqui el token del alumno"></textarea>
               </div>
-              <button class="btn ghost" type="button" [disabled]="registering()" (click)="registerAttendance()">Registrar asistencia</button>
+              <button class="btn ghost" type="button" [disabled]="registering() || !qrToken.trim()" (click)="registerAttendance()">
+                {{ registering() ? 'Registrando...' : 'Registrar asistencia' }}
+              </button>
               <button class="btn ghost" type="button" [disabled]="scannerStarting()" (click)="scannerActive() ? stopScanner() : startScanner()">
                 {{ scannerActive() ? 'Detener camara' : scannerStarting() ? 'Abriendo camara...' : 'Escanear con camara' }}
               </button>
@@ -161,7 +163,11 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
               @for (session of sessions(); track session.session_id) {
                 <div class="metric-row">
                   <span>#{{ session.session_id }} | {{ session.closes_at | slice:0:16 }}</span>
-                  <button class="btn ghost small" type="button" [disabled]="session.status === 'cerrada'" (click)="closeSession(session)">Cerrar</button>
+                  @if (canManage()) {
+                    <button class="btn ghost small" type="button" [disabled]="session.status === 'cerrada'" (click)="closeSession(session)">Cerrar</button>
+                  } @else {
+                    <span class="status-badge" [class]="session.status === 'cerrada' ? 'neutral' : 'success'">{{ session.status }}</span>
+                  }
                 </div>
               }
             </div>
@@ -178,7 +184,15 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
               <h2 class="panel-title">Camara QR</h2>
               <p class="muted">Acerca el QR del alumno al marco. Tambien puedes seguir usando la captura manual.</p>
             </div>
+            <span class="status-badge" [class]="scannerActive() ? 'success' : scannerError() ? 'danger' : 'warning'">
+              {{ scannerActive() ? 'Escaneando' : scannerError() ? 'Revisar permiso' : 'Preparando' }}
+            </span>
             <button class="btn ghost small" type="button" (click)="stopScanner()">Cerrar</button>
+          </div>
+          <div class="scanner-steps" aria-label="Estado de escaneo QR">
+            <span [class.active]="scannerStarting() || scannerActive()">1. Permiso de camara</span>
+            <span [class.active]="scannerActive()">2. Enfoca el QR</span>
+            <span [class.active]="qrToken.trim()">3. Token listo</span>
           </div>
           <div class="scanner-frame">
             <video #scannerVideo autoplay muted playsinline aria-label="Vista previa de la camara"></video>
@@ -290,11 +304,11 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
       padding: 13px;
       border-radius: var(--agm-radius-sm);
       background: var(--agm-accent-soft);
-      color: #1f2937;
+      color: var(--agm-text);
     }
 
     .teacher-session-card span {
-      color: #475569;
+      color: var(--agm-text-soft);
       font-size: 0.84rem;
       line-height: 1.45;
     }
@@ -317,13 +331,38 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
       margin: 4px 0 0;
     }
 
+    .scanner-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .scanner-steps span {
+      min-height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--agm-border);
+      border-radius: var(--agm-radius-sm);
+      color: var(--agm-text-soft);
+      background: var(--agm-surface-muted);
+      font-size: var(--agm-font-size-sm);
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .scanner-steps span.active {
+      color: var(--agm-primary);
+      border-color: color-mix(in srgb, var(--agm-primary) 34%, var(--agm-border));
+      background: var(--agm-primary-soft);
+    }
+
     .scanner-frame {
       position: relative;
       overflow: hidden;
       min-height: 280px;
       border: 1px solid var(--agm-border);
       border-radius: var(--agm-radius);
-      background: #020617;
+      background: color-mix(in srgb, var(--agm-bg) 85%, #020617);
     }
 
     .scanner-frame video {
@@ -338,7 +377,7 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
       inset: 14%;
       border: 2px solid rgba(255, 255, 255, 0.86);
       border-radius: var(--agm-radius);
-      box-shadow: 0 0 0 999px rgba(2, 6, 23, 0.28);
+      box-shadow: 0 0 0 999px rgba(2, 6, 23, 0.34);
     }
 
     .qr-card textarea {
@@ -383,6 +422,10 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
       .attendance-stage {
         grid-template-columns: 1fr;
       }
+
+      .scanner-steps {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
@@ -395,6 +438,7 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   private readonly academics = inject(AcademicsService);
   private readonly attendance = inject(AttendanceService);
   private readonly toasts = inject(ToastService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly loading = signal(true);
   readonly starting = signal(false);
@@ -720,13 +764,14 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     this.scannerStarting.set(true);
     this.scannerError.set(false);
     this.scannerMessage.set('Solicitando permiso de camara...');
+    this.cdr.detectChanges();
 
     try {
       this.scannerStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false
       });
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
       const video = this.scannerVideo?.nativeElement;
       if (!video) {
         throw new Error('No se encontro la vista previa de la camara.');
@@ -738,7 +783,7 @@ export class AttendanceScreen implements OnInit, OnDestroy {
       this.setScannerMessage('Camara activa. Escanea un QR valido.', false);
       this.scanFrame();
     } catch (error: unknown) {
-      this.setScannerMessage(errorMessage(error, 'No se pudo abrir la camara.'), true);
+      this.setScannerMessage(this.cameraErrorMessage(error), true);
       this.stopScanner(false);
     } finally {
       this.scannerStarting.set(false);
@@ -765,12 +810,16 @@ export class AttendanceScreen implements OnInit, OnDestroy {
       return;
     }
     void this.detector.detect(video).then((codes) => {
-      const token = codes.find((code) => code.rawValue)?.rawValue?.trim();
+      const rawValue = codes.find((code) => code.rawValue)?.rawValue?.trim();
+      const token = rawValue ? this.normalizeScannedToken(rawValue) : null;
       if (token) {
         this.qrToken = token;
         this.setScannerMessage('QR detectado. Token listo para registrar.', false);
         this.stopScanner();
         return;
+      }
+      if (rawValue) {
+        this.setScannerMessage('El QR detectado no pertenece a AGM. Intenta con el codigo de asistencia.', true);
       }
       this.scannerFrameId = requestAnimationFrame(() => this.scanFrame());
     }).catch(() => {
@@ -782,5 +831,40 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   private setScannerMessage(message: string, error: boolean): void {
     this.scannerMessage.set(message);
     this.scannerError.set(error);
+  }
+
+  private normalizeScannedToken(rawValue: string): string | null {
+    const value = rawValue.trim();
+    let token = value;
+    try {
+      const url = new URL(value);
+      token = url.searchParams.get('token') || url.hash.replace(/^#token=/, '') || value;
+    } catch {
+      token = value;
+    }
+
+    const clean = token.replace(/\s+/g, '');
+    try {
+      const padded = clean.padEnd(clean.length + ((4 - clean.length % 4) % 4), '=');
+      const decoded = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(decoded) as { p?: string; s?: string };
+      return payload.p && payload.s ? clean : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private cameraErrorMessage(error: unknown): string {
+    const name = error instanceof DOMException ? error.name : '';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return 'Permiso de camara denegado. Habilitalo en el navegador o usa captura manual.';
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      return 'No se encontro una camara disponible. Usa captura manual del token.';
+    }
+    if (name === 'NotReadableError') {
+      return 'La camara esta ocupada por otra aplicacion. Cierra esa app e intenta de nuevo.';
+    }
+    return errorMessage(error, 'No se pudo abrir la camara.');
   }
 }

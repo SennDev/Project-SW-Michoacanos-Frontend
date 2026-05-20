@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -50,10 +50,7 @@ import { errorMessage } from '../../core/utils/error.util';
             <div class="success-panel" role="status">
               <strong>Solicitud registrada</strong>
               <span>Revisa tu correo institucional para continuar.</span>
-              @if (resetToken()) {
-                <small>En este entorno el backend devolvio un token util para pruebas locales.</small>
-                <button class="btn ghost" type="button" (click)="continueWithToken()">Continuar con token</button>
-              }
+              <small>Por seguridad, AGM no muestra ni almacena tokens de recuperacion en el navegador.</small>
             </div>
           }
 
@@ -125,12 +122,10 @@ import { errorMessage } from '../../core/utils/error.util';
 export class RecoverPasswordScreen {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
 
   readonly loading = signal(false);
   readonly submitted = signal(false);
-  readonly resetToken = signal('');
   readonly error = signal('');
 
   readonly form = this.fb.nonNullable.group({
@@ -148,16 +143,11 @@ export class RecoverPasswordScreen {
     this.auth.forgotPassword(this.form.getRawValue()).pipe(
       finalize(() => this.loading.set(false))
     ).subscribe({
-      next: (response) => {
+      next: () => {
         this.submitted.set(true);
-        this.resetToken.set(response?.reset_token ?? '');
         this.toasts.success('Solicitud enviada');
       },
       error: (error: unknown) => this.error.set(errorMessage(error, 'No fue posible solicitar la recuperacion.'))
     });
-  }
-
-  continueWithToken(): void {
-    void this.router.navigate(['/auth/reset'], { queryParams: { token: this.resetToken() } });
   }
 }

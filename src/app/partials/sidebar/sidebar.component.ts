@@ -51,11 +51,11 @@ import { NavItem } from '../../shared/models/ui.models';
       grid-template-rows: auto minmax(0, 1fr) auto;
       gap: 24px;
       padding: 24px 18px;
-      color: #f4fbf8;
+      color: #f8fbff;
       background:
         linear-gradient(180deg, rgba(244, 180, 0, 0.09), transparent 18rem),
         linear-gradient(180deg, var(--agm-sidebar), var(--agm-sidebar-soft));
-      box-shadow: 18px 0 48px rgba(0, 31, 63, 0.14);
+      box-shadow: 18px 0 48px rgba(0, 31, 63, 0.18);
     }
 
     .sidebar-head {
@@ -74,7 +74,7 @@ import { NavItem } from '../../shared/models/ui.models';
     .sidebar-head small,
     .nav-list small,
     .sidebar-note span {
-      color: rgba(255, 255, 255, 0.62);
+      color: rgba(248, 251, 255, 0.72);
       font-size: 0.76rem;
     }
 
@@ -93,14 +93,14 @@ import { NavItem } from '../../shared/models/ui.models';
       align-items: center;
       padding: 11px 10px;
       border-radius: 10px;
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(248, 251, 255, 0.84);
       transition: background 160ms ease, color 160ms ease, transform 160ms ease;
     }
 
     .nav-list a.active,
     .nav-list a:hover {
       color: white;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.13);
       transform: translateX(2px);
     }
 
@@ -111,7 +111,7 @@ import { NavItem } from '../../shared/models/ui.models';
       place-items: center;
       border-radius: 8px;
       color: #fff4cc;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
       font-weight: 900;
     }
 
@@ -126,7 +126,7 @@ import { NavItem } from '../../shared/models/ui.models';
       padding: 14px;
       border: 1px solid rgba(244, 180, 0, 0.18);
       border-radius: var(--agm-radius);
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.09);
     }
 
     .sidebar-note strong {

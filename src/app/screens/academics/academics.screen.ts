@@ -151,7 +151,7 @@ interface StudentRosterRow extends Student {
             emptyMessage="Selecciona una materia e importa alumnos para ver el listado."
           />
           <ng-template #studentActions let-student>
-            <button class="btn danger small" type="button" (click)="askWithdraw(student)">Dar baja</button>
+            <button class="btn ghost small" type="button" (click)="askWithdraw(student)">Revisar baja</button>
           </ng-template>
         </section>
       }
@@ -177,10 +177,10 @@ interface StudentRosterRow extends Student {
 
     <agm-confirmation-modal
       [open]="Boolean(studentToWithdraw())"
-      title="Dar de baja alumno"
-      [message]="'Se registrara la baja de ' + (studentToWithdraw()?.nombre || 'este alumno') + ' en la materia seleccionada.'"
-      confirmLabel="Registrar baja"
-      (confirm)="withdrawStudent()"
+      title="Revisar solicitud de baja"
+      [message]="'La baja de ' + (studentToWithdraw()?.nombre || 'este alumno') + ' debe aprobarse con flujo administrativo. Para evitar bajas directas sin solicitud, esta pantalla no ejecuta eliminaciones contra el backend.'"
+      confirmLabel="Entendido"
+      (confirm)="acknowledgeWithdrawalRequest()"
       (cancel)="studentToWithdraw.set(null)"
     />
   `,
@@ -395,20 +395,9 @@ export class AcademicsScreen implements OnInit {
     this.studentToWithdraw.set(student);
   }
 
-  withdrawStudent(): void {
-    const student = this.studentToWithdraw();
-    const subjectId = this.selectedSubjectId();
-    if (!student || !subjectId) {
-      return;
-    }
-    this.academics.withdrawStudent(student.id, subjectId, 'Baja registrada desde frontend AGM').pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.studentToWithdraw.set(null);
-        this.toasts.success('Baja registrada');
-        this.loadStudents(subjectId);
-      },
-      error: (error: unknown) => this.toasts.error('No se registro la baja', errorMessage(error))
-    });
+  acknowledgeWithdrawalRequest(): void {
+    this.studentToWithdraw.set(null);
+    this.toasts.info('Baja directa bloqueada', 'Se requiere flujo de solicitud y aprobacion administrativa.');
   }
 
   protected readonly Boolean = Boolean;

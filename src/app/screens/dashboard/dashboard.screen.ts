@@ -230,7 +230,7 @@ interface TeacherOverview {
       border-radius: var(--agm-radius-lg);
       background:
         linear-gradient(135deg, rgba(244, 180, 0, 0.12), transparent 38%),
-        linear-gradient(135deg, var(--agm-primary-strong), var(--agm-primary));
+        linear-gradient(135deg, var(--agm-hero-start), var(--agm-hero-end));
       color: white;
       box-shadow: var(--agm-shadow);
       overflow: hidden;

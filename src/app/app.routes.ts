@@ -68,7 +68,7 @@ export const routes: Routes = [
         path: 'notifications',
         canActivate: [roleGuard],
         loadComponent: () => import('./screens/notifications/notifications.screen').then((m) => m.NotificationsScreen),
-        data: { roles: ['admin', 'docente'] }
+        data: { roles: ['admin'] }
       },
       {
         path: 'reports',

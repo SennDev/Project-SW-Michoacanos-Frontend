@@ -48,7 +48,7 @@ import { AuthUser } from '../../shared/models/auth.models';
       padding: 0 30px;
       border-bottom: 1px solid var(--agm-border);
       background:
-        linear-gradient(90deg, color-mix(in srgb, var(--agm-surface) 96%, transparent), color-mix(in srgb, var(--agm-primary-soft) 42%, transparent));
+        linear-gradient(90deg, color-mix(in srgb, var(--agm-surface-glass) 96%, transparent), color-mix(in srgb, var(--agm-primary-soft) 48%, transparent));
       backdrop-filter: blur(18px);
     }
 
@@ -93,8 +93,8 @@ import { AuthUser } from '../../shared/models/auth.models';
       padding: 7px 10px;
       border: 1px solid var(--agm-border);
       border-radius: 999px;
-      background: color-mix(in srgb, var(--agm-surface) 90%, transparent);
-      box-shadow: 0 8px 24px rgba(0, 31, 63, 0.06);
+      background: var(--agm-surface-glass);
+      box-shadow: var(--agm-shadow-soft);
     }
 
     .avatar {

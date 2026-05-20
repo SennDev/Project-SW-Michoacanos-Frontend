@@ -1,6 +1,6 @@
-import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize, forkJoin } from 'rxjs';
+import { catchError, finalize, forkJoin, interval, of, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
 import { SubjectScopeService } from '../../core/services/subject-scope.service';
@@ -170,6 +170,10 @@ interface WeightDraft {
 
           <article class="panel pad">
             <h2 class="panel-title">Actividades disponibles</h2>
+            <div class="persistence-note">
+              <strong>Nota de persistencia</strong>
+              <span>El backend actual permite crear actividades, pero no expone una lectura REST para rehidratarlas despues de reiniciar. AGM conserva esta lista como referencia local del navegador hasta que exista ese endpoint.</span>
+            </div>
             @if (activities().length) {
               <div class="activity-list">
                 @for (activity of activities(); track activity.id) {
@@ -305,6 +309,27 @@ interface WeightDraft {
       gap: 10px;
     }
 
+    .persistence-note {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid color-mix(in srgb, var(--agm-warning) 28%, var(--agm-border));
+      border-radius: var(--agm-radius-sm);
+      background: var(--agm-warning-soft);
+    }
+
+    .persistence-note strong {
+      color: var(--agm-warning);
+      font-size: var(--agm-font-size-sm);
+    }
+
+    .persistence-note span {
+      color: var(--agm-text-soft);
+      font-size: var(--agm-font-size-sm);
+      line-height: 1.45;
+    }
+
     .activity-list button {
       display: grid;
       gap: 3px;
@@ -433,7 +458,7 @@ interface WeightDraft {
     }
   `]
 })
-export class GradesScreen implements OnInit {
+export class GradesScreen implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly subjectScope = inject(SubjectScopeService);
@@ -456,11 +481,14 @@ export class GradesScreen implements OnInit {
   readonly savingStudentIds = signal<number[]>([]);
   readonly savingBatch = signal(false);
   readonly lastSavedAt = signal<Date | null>(null);
+  readonly syncing = signal(false);
+  readonly lastSyncedAt = signal<Date | null>(null);
 
   activityCategoryId: number | null = null;
   activityName = '';
   activityMaxPoints = 100;
   selectedActivityId: number | null = null;
+  private pollSubscription?: Subscription;
 
   readonly summaryColumns: TableColumn<GradeSummary>[] = [
     { key: 'matricula', header: 'Matricula' },
@@ -481,6 +509,10 @@ export class GradesScreen implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+  }
+
+  ngOnDestroy(): void {
+    this.pollSubscription?.unsubscribe();
   }
 
   canEdit(): boolean {
@@ -508,7 +540,9 @@ export class GradesScreen implements OnInit {
         this.selectedSubjectId.set(initial);
         if (initial) {
           this.loadSubjectData(initial, true);
+          this.startPolling(initial);
         } else {
+          this.stopPolling();
           this.loading.set(false);
         }
       },
@@ -523,7 +557,9 @@ export class GradesScreen implements OnInit {
     this.selectedSubjectId.set(id);
     if (id) {
       this.loadSubjectData(id);
+      this.startPolling(id);
     } else {
+      this.stopPolling();
       this.weights.set([]);
       this.weightDraft.set([]);
       this.activities.set([]);
@@ -534,19 +570,23 @@ export class GradesScreen implements OnInit {
   }
 
   loadSubjectData(subjectId: number, finishLoading = false): void {
+    this.syncing.set(true);
     forkJoin({
-      weights: this.grades.listWeights(subjectId),
-      summary: this.grades.getConcentrado(subjectId),
-      students: this.academics.listStudentsBySubject(subjectId)
+      weights: this.grades.listWeights(subjectId).pipe(catchError(() => of([] as WeightCategory[]))),
+      summary: this.grades.getConcentrado(subjectId).pipe(catchError(() => of([] as GradeSummary[]))),
+      students: this.academics.listStudentsBySubject(subjectId).pipe(catchError(() => of([] as Student[]))),
+      activities: of(this.grades.getLocalActivities(subjectId))
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: ({ weights, summary, students }) => {
+      next: ({ weights, summary, students, activities }) => {
         this.weights.set(weights);
         this.weightDraft.set(weights.map((weight) => ({ nombre: weight.nombre, porcentaje: weight.porcentaje })));
         this.summary.set(summary);
         this.students.set(students);
-        this.activities.set(this.grades.getLocalActivities(subjectId));
-        this.selectedActivityId = this.selectedActivityId ?? this.activities()[0]?.id ?? null;
-        this.draftScores.set({});
+        this.activities.set(activities);
+        const stillExists = activities.some((activity) => activity.id === this.selectedActivityId);
+        this.selectedActivityId = stillExists ? this.selectedActivityId : activities[0]?.id ?? null;
+        this.lastSyncedAt.set(new Date());
+        this.syncing.set(false);
         if (finishLoading) {
           this.loading.set(false);
         }
@@ -560,6 +600,7 @@ export class GradesScreen implements OnInit {
         this.activities.set(this.grades.getLocalActivities(subjectId));
         this.selectedActivityId = this.activities()[0]?.id ?? null;
         this.draftScores.set({});
+        this.syncing.set(false);
         if (finishLoading) {
           this.loading.set(false);
         }
@@ -613,11 +654,11 @@ export class GradesScreen implements OnInit {
       finalize(() => this.creatingActivity.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: () => {
+      next: (response) => {
         this.toasts.success('Actividad creada');
         this.activityName = '';
-        this.activities.set(this.grades.getLocalActivities(subjectId));
-        this.selectedActivityId = this.activities()[0]?.id ?? null;
+        this.selectedActivityId = response.id;
+        this.loadSubjectData(subjectId);
       },
       error: (error: unknown) => this.toasts.error('No se creo la actividad', errorMessage(error))
     });
@@ -685,7 +726,9 @@ export class GradesScreen implements OnInit {
   }
 
   captureAverage(): string {
-    const scores = Object.values(this.draftScores()).filter((score): score is number => typeof score === 'number');
+    const scores = this.students()
+      .map((student) => this.gradeDraft(student.id))
+      .filter((score): score is number => typeof score === 'number');
     if (!scores.length) {
       return '--';
     }
@@ -704,10 +747,17 @@ export class GradesScreen implements OnInit {
     if (this.savingBatch() || this.savingStudentIds().length) {
       return 'Guardando cambios...';
     }
+    if (this.syncing()) {
+      return 'Sincronizando datos guardados...';
+    }
     const lastSavedAt = this.lastSavedAt();
-    return lastSavedAt
-      ? `Guardado ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-      : 'Sin cambios pendientes';
+    if (lastSavedAt) {
+      return `Guardado ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    const lastSyncedAt = this.lastSyncedAt();
+    return lastSyncedAt
+      ? `Datos cargados ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : 'Cargando datos guardados';
   }
 
   savingStudent(studentId: number): boolean {
@@ -734,6 +784,11 @@ export class GradesScreen implements OnInit {
       next: () => {
         this.toasts.success('Calificacion guardada');
         this.lastSavedAt.set(new Date());
+        this.draftScores.update((drafts) => {
+          const next = { ...drafts };
+          delete next[student.id];
+          return next;
+        });
         this.loadSubjectData(subjectId);
       },
       error: (error: unknown) => this.toasts.error('No se guardo la calificacion', errorMessage(error))
@@ -762,9 +817,24 @@ export class GradesScreen implements OnInit {
       next: () => {
         this.toasts.success('Captura guardada', `${payloads.length} calificaciones actualizadas`);
         this.lastSavedAt.set(new Date());
+        this.draftScores.set({});
         this.loadSubjectData(subjectId);
       },
       error: (error: unknown) => this.toasts.error('No se guardo la captura', errorMessage(error))
     });
+  }
+
+  private startPolling(subjectId: number): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = interval(30_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (!this.hasDrafts() && !this.savingBatch() && !this.savingStudentIds().length) {
+        this.loadSubjectData(subjectId);
+      }
+    });
+  }
+
+  private stopPolling(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = undefined;
   }
 }

@@ -17,7 +17,10 @@ import { RouterLink } from '@angular/router';
         </a>
         <nav class="nav-links" aria-label="Navegacion publica">
           <a routerLink="/">Inicio</a>
+          <a routerLink="/" fragment="features">Caracteristicas</a>
+          <a routerLink="/" fragment="architecture">Arquitectura</a>
           <a routerLink="/about">Nosotros</a>
+          <a routerLink="/" fragment="technology">Tecnologias</a>
           <a class="btn primary small" routerLink="/auth/login">Acceder</a>
         </nav>
       </header>
@@ -38,6 +41,26 @@ import { RouterLink } from '@angular/router';
           <strong>Principios</strong>
           <p>Claridad operativa, trazabilidad, separacion de dominios y una experiencia digna de un sistema institucional.</p>
         </aside>
+      </section>
+
+      <section class="public-section team-section">
+        <p class="section-kicker">Equipo</p>
+        <h2 class="section-heading">Construido por un equipo enfocado en claridad, utilidad y arquitectura.</h2>
+        <p class="section-copy">
+          AGM fue desarrollado como una plataforma academica integral, cuidando tanto la experiencia visual como la integracion
+          con microservicios, reportes, seguridad por roles y flujos reales de operacion.
+        </p>
+        <div class="team-grid">
+          @for (member of members; track member.name) {
+            <article class="team-card">
+              <span class="member-avatar" aria-hidden="true">{{ member.initials }}</span>
+              <div>
+                <strong>{{ member.name }}</strong>
+                <p>{{ member.focus }}</p>
+              </div>
+            </article>
+          }
+        </div>
       </section>
 
       <section class="architecture-band">
@@ -118,15 +141,80 @@ import { RouterLink } from '@angular/router';
       line-height: 1.5;
     }
 
+    .team-section {
+      padding-top: 32px;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .team-card {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      min-height: 178px;
+      padding: 18px;
+      border: 1px solid var(--agm-border);
+      border-radius: var(--agm-radius);
+      background:
+        linear-gradient(160deg, color-mix(in srgb, var(--agm-primary-soft) 48%, transparent), transparent),
+        var(--agm-surface);
+      box-shadow: var(--agm-shadow-soft);
+    }
+
+    .member-avatar {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: #1f2937;
+      background: var(--agm-accent);
+      font-weight: 950;
+    }
+
+    .team-card strong {
+      display: block;
+      font-size: 1.05rem;
+    }
+
+    .team-card p {
+      margin: 7px 0 0;
+      color: var(--agm-text-soft);
+      line-height: 1.5;
+    }
+
     @media (max-width: 920px) {
       .about-hero,
       .about-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .team-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .team-grid {
         grid-template-columns: 1fr;
       }
     }
   `]
 })
 export class AboutScreen {
+  readonly members = [
+    { name: 'Fernando', initials: 'F', focus: 'Flujos academicos y validacion funcional.' },
+    { name: 'Gerson', initials: 'G', focus: 'Frontend, experiencia visual e integracion.' },
+    { name: 'Rodrigo', initials: 'R', focus: 'Microservicios y arquitectura distribuida.' },
+    { name: 'Pablo', initials: 'P', focus: 'Calificaciones, reportes y datos academicos.' },
+    { name: 'Bernardo', initials: 'B', focus: 'Asistencia QR, pruebas y estabilidad.' }
+  ];
+
   readonly timeline = [
     { title: 'Ingreso seguro', copy: 'JWT y RBAC delimitan pantallas y acciones desde la sesion.' },
     { title: 'Datos academicos', copy: 'PDF, CSV y XLSX alimentan periodos, docentes, alumnos y materias.' },

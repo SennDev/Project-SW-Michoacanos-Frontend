@@ -40,8 +40,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Notificaciones',
     route: '/notifications',
     icon: 'mail',
-    roles: ['admin', 'docente'],
-    description: 'Correos y bitacora'
+    roles: ['admin'],
+    description: 'Correos y bitacora admin'
   },
   {
     label: 'Reportes',

@@ -16,6 +16,7 @@ import { RouterLink } from '@angular/router';
           </span>
         </a>
         <nav class="nav-links" aria-label="Navegacion publica">
+          <a href="#inicio">Inicio</a>
           <a href="#features">Caracteristicas</a>
           <a href="#architecture">Arquitectura</a>
           <a routerLink="/about">Nosotros</a>
