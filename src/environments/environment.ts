@@ -4,12 +4,12 @@ export const environment = {
   production: true,
   useMockFallback: false,
   api: {
-    auth: 'http://127.0.0.1:8011',
-    periods: 'http://127.0.0.1:8012',
-    academics: 'http://127.0.0.1:8013',
-    grades: 'http://127.0.0.1:8014',
-    attendance: 'http://127.0.0.1:8015',
-    notifications: 'http://127.0.0.1:8016',
-    reports: 'http://127.0.0.1:8017'
+    auth: 'http://3.94.103.183:8011',
+    periods: 'http://3.94.103.183:8012',
+    academics: 'http://3.94.103.183:8013',
+    grades: 'http://3.94.103.183:8014',
+    attendance: 'http://3.94.103.183:8015',
+    notifications: 'http://3.94.103.183:8016',
+    reports: 'http://3.94.103.183:8017'
   } satisfies ApiConfig
 };

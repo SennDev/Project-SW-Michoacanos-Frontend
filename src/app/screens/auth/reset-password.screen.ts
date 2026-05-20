@@ -25,51 +25,58 @@ import { errorMessage } from '../../core/utils/error.util';
           <div>
             <p class="section-kicker">Restablecer acceso</p>
             <h1>Define tu nueva contrasena.</h1>
-            <p class="muted">El token debe seguir vigente y no haber sido usado antes. AGM no lo guarda en almacenamiento local.</p>
+            <p class="muted">{{ resetIntro() }}</p>
           </div>
 
-          <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()">
-            @if (secureLinkToken()) {
-              <div class="security-note" role="status">
-                <strong>Token de enlace detectado</strong>
-                <span>Se oculto del formulario y se retiro de la URL para reducir exposicion.</span>
-              </div>
-            } @else {
+          <div class="flow-steps" aria-label="Proceso de recuperacion">
+            <span class="done">1. Correo</span>
+            <span class="active">2. Token</span>
+            <span>3. Nueva contrasena</span>
+          </div>
+
+          @if (!success()) {
+            <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()">
+              @if (secureLinkToken()) {
+                <div class="security-note" role="status">
+                  <strong>Token de enlace detectado</strong>
+                  <span>Se oculto del formulario y se retiro de la URL para reducir exposicion.</span>
+                </div>
+              } @else {
+                <div class="field">
+                  <label for="token">Token de recuperacion</label>
+                  <input id="token" formControlName="token" autocomplete="one-time-code" spellcheck="false" placeholder="Pega aqui el token recibido">
+                  @if (form.controls.token.touched && form.controls.token.invalid) {
+                    <span class="field-error">Ingresa el token recibido.</span>
+                  }
+                </div>
+              }
+
               <div class="field">
-                <label for="token">Token de recuperacion</label>
-                <input id="token" formControlName="token" autocomplete="one-time-code" spellcheck="false">
-                @if (form.controls.token.touched && form.controls.token.invalid) {
-                  <span class="field-error">Ingresa el token recibido.</span>
+                <label for="new-password">Nueva contrasena</label>
+                <input id="new-password" type="password" autocomplete="new-password" formControlName="new_password" placeholder="Minimo 8 caracteres">
+                @if (form.controls.new_password.touched && form.controls.new_password.invalid) {
+                  <span class="field-error">Usa al menos 8 caracteres e incluye letras y numeros.</span>
                 }
               </div>
-            }
 
-            <div class="field">
-              <label for="new-password">Nueva contrasena</label>
-              <input id="new-password" type="password" autocomplete="new-password" formControlName="new_password">
-              @if (form.controls.new_password.touched && form.controls.new_password.invalid) {
-                <span class="field-error">Usa al menos 8 caracteres e incluye letras y numeros.</span>
+              <div class="field">
+                <label for="confirm-password">Confirmar contrasena</label>
+                <input id="confirm-password" type="password" autocomplete="new-password" formControlName="confirm_password" placeholder="Repite la nueva contrasena">
+                @if (form.controls.confirm_password.touched && passwordMismatch()) {
+                  <span class="field-error">Las contrasenas deben coincidir.</span>
+                }
+              </div>
+
+              @if (error()) {
+                <div class="login-error" role="alert">{{ error() }}</div>
               }
-            </div>
 
-            <div class="field">
-              <label for="confirm-password">Confirmar contrasena</label>
-              <input id="confirm-password" type="password" autocomplete="new-password" formControlName="confirm_password">
-              @if (form.controls.confirm_password.touched && passwordMismatch()) {
-                <span class="field-error">Las contrasenas deben coincidir.</span>
-              }
-            </div>
-
-            @if (error()) {
-              <div class="login-error" role="alert">{{ error() }}</div>
-            }
-
-            <button class="btn primary" type="submit" [disabled]="form.invalid || passwordMismatch() || loading()">
-              {{ loading() ? 'Actualizando...' : 'Actualizar contrasena' }}
-            </button>
-          </form>
-
-          @if (success()) {
+              <button class="btn primary" type="submit" [disabled]="form.invalid || passwordMismatch() || loading()">
+                {{ loading() ? 'Actualizando...' : 'Actualizar contrasena' }}
+              </button>
+              <a class="btn ghost" routerLink="/auth/recover">Solicitar otro token</a>
+            </form>
+          } @else {
             <div class="success-panel" role="status">
               <strong>Contrasena actualizada</strong>
               <span>Ya puedes iniciar sesion con tu nueva contrasena.</span>
@@ -106,11 +113,35 @@ import { errorMessage } from '../../core/utils/error.util';
 
     .login-error,
     .success-panel,
-    .security-note {
+    .security-note,
+    .flow-steps {
       display: grid;
       gap: 8px;
       padding: 14px;
       border-radius: var(--agm-radius-sm);
+    }
+
+    .flow-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border: 1px solid var(--agm-border);
+      background: var(--agm-surface-muted);
+    }
+
+    .flow-steps span {
+      min-height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--agm-radius-sm);
+      color: var(--agm-text-soft);
+      font-size: var(--agm-font-size-sm);
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .flow-steps span.active,
+    .flow-steps span.done {
+      color: var(--agm-primary);
+      background: var(--agm-primary-soft);
     }
 
     .login-error {
@@ -130,6 +161,12 @@ import { errorMessage } from '../../core/utils/error.util';
     .security-note span {
       color: var(--agm-text-soft);
     }
+
+    @media (max-width: 560px) {
+      .flow-steps {
+        grid-template-columns: 1fr;
+      }
+    }
   `]
 })
 export class ResetPasswordScreen implements OnInit {
@@ -143,6 +180,7 @@ export class ResetPasswordScreen implements OnInit {
   readonly success = signal(false);
   readonly error = signal('');
   readonly secureLinkToken = signal('');
+  readonly recoveryEmail = signal('');
 
   readonly form = this.fb.nonNullable.group({
     token: ['', Validators.required],
@@ -152,6 +190,7 @@ export class ResetPasswordScreen implements OnInit {
 
   ngOnInit(): void {
     const token = this.route.snapshot.queryParamMap.get('token');
+    this.recoveryEmail.set(this.route.snapshot.queryParamMap.get('email') ?? '');
     if (token) {
       this.secureLinkToken.set(token);
       this.form.controls.token.clearValidators();
@@ -161,6 +200,14 @@ export class ResetPasswordScreen implements OnInit {
         window.history.replaceState(null, document.title, '/auth/reset');
       }
     }
+  }
+
+  resetIntro(): string {
+    const email = this.recoveryEmail();
+    if (email) {
+      return `Escribe el token enviado a ${email} y define una contrasena nueva.`;
+    }
+    return 'Escribe el token de recuperacion y una contrasena nueva. El token debe seguir vigente y no haber sido usado antes.';
   }
 
   passwordMismatch(): boolean {

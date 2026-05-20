@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -24,8 +24,14 @@ import { errorMessage } from '../../core/utils/error.util';
 
           <div>
             <p class="section-kicker">Recuperar contrasena</p>
-            <h1>Solicita un enlace seguro.</h1>
-            <p class="muted">Si el correo existe, AGM generara una recuperacion valida por una hora.</p>
+            <h1>Solicita tu token de recuperacion.</h1>
+            <p class="muted">Primero validamos el correo y despues te llevamos al paso para escribir el token y definir tu nueva contrasena.</p>
+          </div>
+
+          <div class="flow-steps" aria-label="Proceso de recuperacion">
+            <span class="active">1. Correo</span>
+            <span>2. Token</span>
+            <span>3. Nueva contrasena</span>
           </div>
 
           <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()">
@@ -42,15 +48,15 @@ import { errorMessage } from '../../core/utils/error.util';
             }
 
             <button class="btn primary" type="submit" [disabled]="form.invalid || loading()">
-              {{ loading() ? 'Enviando...' : 'Solicitar recuperacion' }}
+              {{ loading() ? 'Enviando token...' : 'Enviar token y continuar' }}
             </button>
+            <a class="btn ghost" routerLink="/auth/reset">Ya tengo un token</a>
           </form>
 
           @if (submitted()) {
             <div class="success-panel" role="status">
-              <strong>Solicitud registrada</strong>
-              <span>Revisa tu correo institucional para continuar.</span>
-              <small>Por seguridad, AGM no muestra ni almacena tokens de recuperacion en el navegador.</small>
+              <strong>Token solicitado</strong>
+              <span>Abriendo el formulario para restablecer tu contrasena...</span>
             </div>
           }
 
@@ -84,11 +90,34 @@ import { errorMessage } from '../../core/utils/error.util';
     }
 
     .login-error,
-    .success-panel {
+    .success-panel,
+    .flow-steps {
       display: grid;
       gap: 8px;
       padding: 14px;
       border-radius: var(--agm-radius-sm);
+    }
+
+    .flow-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border: 1px solid var(--agm-border);
+      background: var(--agm-surface-muted);
+    }
+
+    .flow-steps span {
+      min-height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--agm-radius-sm);
+      color: var(--agm-text-soft);
+      font-size: var(--agm-font-size-sm);
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .flow-steps span.active {
+      color: var(--agm-primary);
+      background: var(--agm-primary-soft);
     }
 
     .login-error {
@@ -117,11 +146,18 @@ import { errorMessage } from '../../core/utils/error.util';
       color: var(--agm-primary);
       font-weight: 800;
     }
+
+    @media (max-width: 560px) {
+      .flow-steps {
+        grid-template-columns: 1fr;
+      }
+    }
   `]
 })
 export class RecoverPasswordScreen {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
 
   readonly loading = signal(false);
@@ -144,8 +180,10 @@ export class RecoverPasswordScreen {
       finalize(() => this.loading.set(false))
     ).subscribe({
       next: () => {
+        const email = this.form.controls.email.value.trim();
         this.submitted.set(true);
-        this.toasts.success('Solicitud enviada');
+        this.toasts.success('Token enviado', 'Continua con el token recibido.');
+        void this.router.navigate(['/auth/reset'], { queryParams: { email } });
       },
       error: (error: unknown) => this.error.set(errorMessage(error, 'No fue posible solicitar la recuperacion.'))
     });
