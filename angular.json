@@ -35,7 +35,9 @@
             "styles": [
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": [],
+
+            "baseHref": "/Project-SW-Michoacanos-Frontend/"
           },
           "configurations": {
             "production": {
@@ -78,6 +80,9 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "deploy": {
+          "builder": "angular-cli-ghpages:deploy"
         }
       }
     }
