@@ -2,17 +2,23 @@
 
 Production-quality Angular 20+ SPA for **AGM - Academic Grade Management**.
 
+Demo on GitHub Pages:
+
+```text
+https://senndev.github.io/Project-SW-Michoacanos-Frontend/
+```
+
 The app consumes only the REST endpoints exposed by the backend microservices:
 
 | Domain | URL |
 | --- | --- |
-| Auth | `http://3.94.103.183:8011` |
-| Periods | `http://3.94.103.183:8012` |
-| Academics | `http://3.94.103.183:8013` |
-| Grades | `http://3.94.103.183:8014` |
-| Attendance | `http://3.94.103.183:8015` |
-| Notifications | `http://3.94.103.183:8016` |
-| Reports | `http://3.94.103.183:8017` |
+| Auth | `http://3.95.61.121:8011` |
+| Periods | `http://3.95.61.121:8012` |
+| Academics | `http://3.95.61.121:8013` |
+| Grades | `http://3.95.61.121:8014` |
+| Attendance | `http://3.95.61.121:8015` |
+| Notifications | `http://3.95.61.121:8016` |
+| Reports | `http://3.95.61.121:8017` |
 
 ## Features
 
@@ -44,7 +50,7 @@ npm start
 Open:
 
 ```text
-http://3.94.103.183:8080
+http://3.95.61.121:8080
 ```
 
 Seeded dev credentials:

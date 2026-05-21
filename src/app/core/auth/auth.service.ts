@@ -30,7 +30,7 @@ export class AuthService {
 
   login(payload: LoginRequest): Observable<AuthUser> {
     return this.http
-      .post<ApiResponse<TokenResponse>>(`${this.apiConfig.auth}/auth/login`, payload)
+      .post<ApiResponse<TokenResponse>>(`${this.apiConfig.auth}/login`, payload)
       .pipe(
         map((response) => {
           if (!response.success) {
@@ -45,7 +45,7 @@ export class AuthService {
 
   refreshProfile(): Observable<AuthUser> {
     return this.http
-      .get<ApiResponse<AuthUser>>(`${this.apiConfig.auth}/auth/me`)
+      .get<ApiResponse<AuthUser>>(`${this.apiConfig.auth}/me`)
       .pipe(
         map((response) => response.data),
         tap((user) => {
@@ -59,13 +59,13 @@ export class AuthService {
 
   forgotPassword(payload: ForgotPasswordRequest): Observable<ForgotPasswordResponse | null> {
     return this.http
-      .post<ApiResponse<ForgotPasswordResponse | null>>(`${this.apiConfig.auth}/auth/forgot-password`, payload)
+      .post<ApiResponse<ForgotPasswordResponse | null>>(`${this.apiConfig.auth}/forgot-password`, payload)
       .pipe(map((response) => response.data));
   }
 
   resetPassword(payload: ResetPasswordRequest): Observable<null> {
     return this.http
-      .post<ApiResponse<null>>(`${this.apiConfig.auth}/auth/reset-password`, payload)
+      .post<ApiResponse<null>>(`${this.apiConfig.auth}/reset-password`, payload)
       .pipe(map((response) => response.data));
   }
 
