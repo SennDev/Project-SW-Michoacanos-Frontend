@@ -1,0 +1,407 @@
+/* ==========================================================================
+   1. ESTRUCTURA SPA & ZERO-SCROLL GARANTIZADO
+   ========================================================================== */
+:host {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 84px); /* Evita el salto de página y respeta el Navbar */
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Píldora de Estado (Conectado / Sincronizado) */
+.live-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--agm-surface-muted, #f8fafc);
+  border: 1px solid var(--agm-border, #e2e8f0);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--agm-text-soft, #64748b);
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--agm-success, #10b981);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Wrapper Principal (Fuerza a ocupar el alto restante sin desbordar) */
+.few-dashboard-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+.few-dashboard {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   2. INTERACTIVIDAD LIGERA: BARRA DE FILTROS (CHIPS)
+   ========================================================================== */
+.subject-filter-bar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 8px 0;
+  scrollbar-width: none; /* Firefox */
+  &::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+  .chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 8px 18px;
+    border-radius: 24px;
+    border: 1px solid var(--agm-border);
+    background: var(--agm-panel-bg);
+    color: var(--agm-text-soft);
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+
+    &:hover {
+      border-color: var(--agm-primary);
+      color: var(--agm-primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    &.active {
+      background: var(--agm-primary);
+      color: white;
+      border-color: var(--agm-primary);
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+    }
+  }
+}
+
+/* ==========================================================================
+   3. CABECERA HERO Y KPIS PRINCIPALES
+   ========================================================================== */
+.dashboard-command {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 20px;
+  align-items: stretch;
+  padding: 20px 24px;
+  border: 1px solid color-mix(in srgb, var(--agm-primary) 18%, var(--agm-border));
+  border-radius: var(--agm-radius-lg);
+  color: white;
+  background: linear-gradient(135deg, var(--agm-hero-start), var(--agm-hero-end));
+  box-shadow: var(--agm-shadow);
+
+  .command-content { display: flex; flex-direction: column; justify-content: center; }
+  h2 { margin: 6px 0 4px; font-size: clamp(1.5rem, 2vw, 1.8rem); font-weight: 800; line-height: 1.1; }
+  p { margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem; line-height: 1.4; }
+}
+
+.dashboard-meta {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--agm-radius);
+  background: rgba(255, 255, 255, 0.1);
+  strong { font-size: 1rem; }
+  span { color: rgba(255, 255, 255, 0.85); font-size: 0.85rem; font-weight: 700;}
+}
+
+/* Tarjetas Indicadoras (Tira superior) */
+.signal-strip {
+  flex-shrink: 0;
+  display: grid;
+  gap: 16px;
+  /* Columns se inyectan via HTML según el número de KPIs */
+}
+
+.metric-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius);
+  background: var(--agm-panel-bg);
+  box-shadow: var(--agm-shadow-soft);
+  border-left: 6px solid var(--tile-tone, var(--agm-primary));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.05); }
+
+  span { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+  strong { margin: 8px 0; color: var(--agm-text); font-size: clamp(2rem, 3.5vw, 2.6rem); font-weight: 900; line-height: 1; }
+  small { color: var(--agm-text-soft); font-size: 0.9rem; font-weight: 600;}
+
+  &.primary { --tile-tone: var(--agm-primary); }
+  &.success { --tile-tone: var(--agm-success); }
+  &.warning { --tile-tone: var(--agm-warning); }
+  &.danger { --tile-tone: var(--agm-danger); }
+  &.neutral { --tile-tone: var(--agm-border-strong); }
+}
+
+/* ==========================================================================
+   4. SISTEMA GRID PRINCIPAL (Eliminación de espacios vacíos)
+   ========================================================================== */
+.dashboard-grid {
+  flex: 1;
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+
+  /* Docente/Alumno: Distribución perfecta en 3 columnas */
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.25fr) minmax(280px, 1fr);
+  grid-template-areas:
+    "exceptions trend actions"
+    "focus focus side";
+
+  /* Rediseño Admin: Sin gráfica de pastel, ocupando todo el ancho inteligentemente */
+  &.admin-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "exceptions side"
+      "focus actions";
+  }
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius);
+  background: var(--agm-panel-bg);
+  box-shadow: var(--agm-shadow-soft);
+  height: 100%; /* Obliga a la tarjeta a llenar el hueco del Grid */
+}
+
+/* Áreas de asignación */
+.exceptions-card { grid-area: exceptions; }
+.trend-card { grid-area: trend; }
+.action-card { grid-area: actions; }
+.focus-card { grid-area: focus; }
+.service-card, .guidance-card { grid-area: side; }
+
+/* Cabeceras Internas */
+.section-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--agm-surface-muted);
+  padding-bottom: 8px;
+
+  span { color: var(--agm-text-soft); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; }
+  strong { color: var(--agm-text); font-size: 1.25rem; font-weight: 800; line-height: 1; }
+}
+
+/* Cuerpos de Tarjeta Adaptables */
+.card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  &.scrollable { overflow-y: auto; padding-right: 6px; }
+
+  /* Utilidad crítica para centrar elementos (como el Pastel) sin importar la altura */
+  &.center-flex {
+    justify-content: center;
+    align-items: center;
+    margin: auto 0; /* Auto-margen para alinear al centro absoluto del espacio sobrante */
+  }
+  &.flex-col-between { justify-content: space-between; }
+}
+
+/* ==========================================================================
+   5. ELEMENTOS UI INTERNOS
+   ========================================================================== */
+
+/* Filas de Excepciones */
+.exception-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--agm-border);
+
+  &:last-child { border-bottom: none; }
+  .status-badge { align-self: flex-start; }
+  p { margin: 0; color: var(--agm-text); font-size: 0.95rem; line-height: 1.4; }
+}
+
+/* Gráfica de Pastel Perfectamente Centrada */
+.pie-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 32px; /* Mayor separación entre pastel y leyenda */
+  padding: 10px 0;
+}
+
+.pie-chart {
+  width: 135px;
+  height: 135px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  &:hover { transform: scale(1.05); } /* Efecto pop */
+}
+
+.pie-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  li { display: flex; align-items: center; gap: 10px; }
+  .legend-color { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .legend-text { font-size: 1.05rem; color: var(--agm-text); font-weight: 700; }
+}
+
+/* Acciones Rápidas (Botones anchos y estéticos) */
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+
+  a {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border: 1px solid var(--agm-border);
+    border-radius: var(--agm-radius-sm);
+    background: var(--agm-surface-muted);
+    text-decoration: none;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateX(4px);
+      border-color: var(--agm-primary);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      background: white;
+    }
+
+    .action-code {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--agm-radius-sm);
+      color: white;
+      background: var(--agm-primary);
+      font-weight: 800;
+      font-size: 1.2rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .action-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      strong { color: var(--agm-text); font-size: 1.05rem; font-weight: 800; }
+      span { color: var(--agm-text-soft); font-size: 0.9rem; line-height: 1.2; }
+    }
+  }
+
+  a.success .action-code { background: var(--agm-success); }
+  a.warning .action-code { background: var(--agm-warning); }
+  a.info .action-code { background: var(--agm-info); }
+}
+
+/* Listas Secundarias (Focus/Services) */
+.focus-list, .service-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.service-list { grid-template-columns: 1fr; }
+
+.focus-item, .service-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius-sm);
+  background: var(--agm-surface-muted);
+
+  strong { color: var(--agm-text); font-size: 1rem; font-weight: 700; }
+  span { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 500; }
+}
+
+.service-item {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+
+  span:first-child { font-weight: 700; color: var(--agm-text); font-size: 1rem; }
+}
+
+.guidance-card p {
+  color: var(--agm-text);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+/* ==========================================================================
+   6. RESPONSIVIDAD (Quita el Zero-Scroll solo donde es necesario)
+   ========================================================================== */
+@media (max-width: 1300px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "exceptions trend" "focus actions" "side side";
+  }
+  .dashboard-grid.admin-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "exceptions" "side" "focus" "actions";
+  }
+  :host { height: auto; overflow: visible; } /* Desactiva el candado de altura */
+}
+
+@media (max-width: 850px) {
+  .signal-strip { grid-template-columns: 1fr 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr; grid-template-areas: "exceptions" "trend" "actions" "focus" "side"; }
+  .focus-list { grid-template-columns: 1fr; }
+  .dashboard-command { grid-template-columns: 1fr; }
+}

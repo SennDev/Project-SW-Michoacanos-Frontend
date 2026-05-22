@@ -1,0 +1,184 @@
+<agm-page-header
+  eyebrow="Panel Inicial"
+  [title]="title()"
+  [description]="activePeriodName()">
+
+  <div class="header-tools">
+    <span class="live-status-pill">
+      <span class="pulse-dot"></span>
+      Supervisión en Tiempo Real
+    </span>
+    <a class="btn primary outline" routerLink="/reports">Exportar reportes</a>
+  </div>
+</agm-page-header>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="4" />
+} @else {
+  <div class="few-dashboard-wrapper">
+    <section class="few-dashboard" [class.admin]="isAdmin()" @dashboardReveal>
+
+      <header class="dashboard-command">
+        <div class="command-content">
+          <span class="status-badge info">{{ dashboardIntent().type }}</span>
+          <h2>{{ heroTitle() }}</h2>
+          <p>{{ dashboardIntent().objective }}</p>
+        </div>
+        <div class="dashboard-meta" aria-label="Estado de actualizacion">
+          <strong>{{ dashboardIntent().label }}</strong>
+          <span>{{ dashboardIntent().cadence }}</span>
+          <span class="sync-line">
+            <span class="sync-dot" aria-hidden="true"></span>
+            {{ lastUpdatedLabel() }}
+          </span>
+        </div>
+      </header>
+
+      @if (!isAdmin() && state().subjects.length > 0) {
+        <nav class="subject-filter-bar" aria-label="Filtro de materias">
+          <button
+            class="chip"
+            [class.active]="selectedSubjectId() === null"
+            (click)="selectSubject(null)">
+            Vista Global
+          </button>
+          @for (sub of state().subjects; track sub.id) {
+            <button
+              class="chip"
+              [class.active]="selectedSubjectId() === sub.id"
+              (click)="selectSubject(sub.id)">
+              {{ sub.nombre }}
+            </button>
+          }
+        </nav>
+      }
+
+      <section class="signal-strip" [style.grid-template-columns]="'repeat(' + primaryMetrics().length + ', 1fr)'" aria-label="Indicadores principales">
+        @for (metric of primaryMetrics(); track metric.label) {
+          <article class="metric-tile" [class]="metric.tone">
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+            <small>{{ metric.context }}</small>
+          </article>
+        }
+      </section>
+
+      <section class="dashboard-grid">
+
+        <article class="dashboard-card exceptions-card">
+          <div class="section-head">
+            <span>Atención Requerida</span>
+            <strong>{{ exceptions().length }}</strong>
+          </div>
+          <div class="card-body scrollable">
+            @for (item of exceptions(); track item.label) {
+              <div class="exception-row" [class]="item.tone">
+                <span class="status-badge" [class]="item.tone">{{ item.label }}</span>
+                <p>{{ item.detail }}</p>
+              </div>
+            } @empty {
+              <div class="exception-row success">
+                <span class="status-badge success">Correcto</span>
+                <p>No existen anomalías u observaciones en tu vista actual.</p>
+              </div>
+            }
+          </div>
+        </article>
+
+        @if (pieChartData(); as pie) {
+          <article class="dashboard-card trend-card">
+            <div class="section-head">
+              <span>{{ pie.title }}</span>
+            </div>
+            <div class="card-body center-flex">
+              <div class="pie-container">
+                <div class="pie-chart" [style.background]="pie.gradient"></div>
+                <ul class="pie-legend">
+                  @for (label of pie.labels; track label; let i = $index) {
+                    <li>
+                      <span class="legend-color" [style.background]="pie.colors[i]"></span>
+                      <span class="legend-text">{{ label }} ({{ pie.values[i] }})</span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </div>
+          </article>
+        }
+
+        <article class="dashboard-card action-card">
+          <div class="section-head">
+            <span>Operaciones Disponibles</span>
+          </div>
+          <div class="card-body">
+            <div class="quick-actions">
+              @for (action of quickActions(); track action.route) {
+                <a [routerLink]="action.route" [class]="action.tone">
+                  <span class="action-code" aria-hidden="true">{{ action.code }}</span>
+                  <div class="action-text">
+                    <strong class="action-title">{{ action.label }}</strong>
+                    <span>{{ action.description }}</span>
+                  </div>
+                </a>
+              }
+            </div>
+          </div>
+        </article>
+
+        <article class="dashboard-card focus-card">
+          <div class="section-head">
+            <span>{{ focusTitle() }}</span>
+            <strong>{{ focusItems().length }}</strong>
+          </div>
+          <div class="card-body scrollable">
+            <div class="focus-list">
+              @for (item of focusItems(); track item.label) {
+                <div class="focus-item">
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.detail }}</span>
+                </div>
+              } @empty {
+                <p class="muted">Sin asignaciones ni datos complementarios.</p>
+              }
+            </div>
+          </div>
+        </article>
+
+        @if (isAdmin()) {
+          <article class="dashboard-card service-card">
+            <div class="section-head">
+              <span>Nodos de Producción</span>
+              <strong>{{ onlineCount() }}/{{ state().health.length }}</strong>
+            </div>
+            <div class="card-body scrollable">
+              <div class="service-list">
+                @for (service of state().health; track service.key) {
+                  <div class="service-item">
+                    <span>{{ service.name }}</span>
+                    <span class="status-badge" [class]="service.status === 'online' ? 'success' : 'danger'">
+                      {{ service.status === 'online' ? 'VIVO' : 'CAÍDO' }}
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+          </article>
+        } @else {
+          <article class="dashboard-card guidance-card">
+            <div class="section-head">
+              <span>Módulo de Recomendación</span>
+              <span class="status-badge" [class]="recommendation().priority === 'Alta' ? 'danger' : 'info'">
+                {{ recommendation().priority }}
+              </span>
+            </div>
+            <div class="card-body flex-col-between">
+              <p class="guidance-text">{{ recommendation().detail }}</p>
+              <a class="btn primary small block" [routerLink]="recommendation().route">{{ recommendation().label }}</a>
+            </div>
+          </article>
+        }
+
+      </section>
+    </section>
+  </div>
+}

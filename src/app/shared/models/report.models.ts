@@ -12,6 +12,7 @@ export interface TeacherStats {
 }
 
 export interface StudentStats {
+  faltas: number;
   materia_id: number;
   materia: string;
   promedio_actual: number;
