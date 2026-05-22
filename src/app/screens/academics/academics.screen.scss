@@ -1,0 +1,327 @@
+/* ==========================================================================
+   1. CONTENCIÓN ESTRICTA Y CABECERA
+   ========================================================================== */
+:host {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 84px);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  .last-updated {
+    font-size: 0.85rem;
+    color: var(--agm-text-soft);
+    font-weight: 500;
+  }
+}
+
+.console-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+/* --- Navegación por Pestañas --- */
+.console-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--agm-border);
+  margin-bottom: 16px;
+  padding: 0 4px;
+  overflow-x: auto; /* Permite scroll en pestañas en móviles muy pequeños */
+
+  button {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--agm-text-soft);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+
+    &:hover { color: var(--agm-primary); }
+    &.active {
+      color: var(--agm-primary);
+      border-bottom-color: var(--agm-primary);
+    }
+  }
+}
+
+.console-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0; /* Previene desbordamiento en Flexbox */
+}
+
+/* ==========================================================================
+   2. ESTILOS GLOBALES DE TABLAS NATIVAS Y BOTONES
+   ========================================================================== */
+.table-container {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* Suaviza el scroll horizontal en iOS */
+  min-height: 0;
+  min-width: 0;
+
+  .agm-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 650px; /* Fuerza el scroll horizontal antes de aplastar el contenido */
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--agm-surface-muted);
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--agm-text-soft);
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--agm-border);
+      z-index: 10;
+    }
+
+    tbody td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--agm-border);
+      font-size: 0.95rem;
+      color: var(--agm-text);
+      strong { font-weight: 700; }
+    }
+
+    tbody tr:hover td { background: var(--agm-surface-muted); }
+
+    .empty-cell { text-align: center; color: var(--agm-text-soft); padding: 40px; font-style: italic;}
+  }
+
+  &::-webkit-scrollbar { width: 6px; height: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background-color: var(--agm-border-strong); border-radius: 10px; }
+}
+
+/* Botón neutral para los que no han solicitado baja */
+.btn-neutral {
+  background-color: var(--agm-surface-muted);
+  color: var(--agm-text-soft);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--agm-border);
+    color: var(--agm-text);
+  }
+}
+
+/* ==========================================================================
+   3. PESTAÑA: DOCENTES
+   ========================================================================== */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+
+  .import-panel { flex-shrink: 0; }
+
+  .table-panel {
+    background: var(--agm-panel-bg);
+    border: 1px solid var(--agm-border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0; /* Vital para que el grid no se expanda */
+  }
+}
+
+/* ==========================================================================
+   4. PESTAÑA: MATERIAS
+   ========================================================================== */
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 8px;
+  min-height: 0;
+
+  .subject-card {
+    background: var(--agm-panel-bg);
+    border: 1px solid var(--agm-border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--agm-shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      strong { color: var(--agm-text-soft); font-size: 0.9rem; }
+    }
+
+    h2 { margin: 12px 0 7px; font-size: 1.05rem; color: var(--agm-text); line-height: 1.3; }
+    p, small { color: var(--agm-text-soft); }
+    p { margin: 0 0 16px 0; font-size: 0.9rem; }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--agm-surface-muted);
+      padding-top: 12px;
+      small { font-weight: 600; }
+    }
+  }
+}
+
+/* ==========================================================================
+   5. PESTAÑA: ALUMNOS (Maestro-Detalle adaptativo)
+   ========================================================================== */
+.master-detail-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0; /* Previene estiramiento del grid principal */
+
+  .sidebar-list {
+    background: var(--agm-panel-bg);
+    border: 1px solid var(--agm-border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .sidebar-header {
+      padding: 16px;
+      background: var(--agm-surface-muted);
+      border-bottom: 1px solid var(--agm-border);
+      h4 { margin: 0; font-size: 1rem; color: var(--agm-text); }
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .sidebar-item {
+        padding: 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid transparent;
+        transition: all 0.15s;
+
+        strong { font-size: 0.95rem; color: var(--agm-text); margin-bottom: 2px; }
+        span { font-size: 0.85rem; color: var(--agm-text-soft); }
+
+        &:hover { background: var(--agm-surface-muted); }
+        &.active {
+          background: var(--agm-primary-soft);
+          border-color: var(--agm-primary);
+          strong { color: var(--agm-primary); }
+        }
+      }
+      .muted-text { text-align: center; color: var(--agm-text-soft); padding: 20px; font-size: 0.9rem;}
+    }
+  }
+
+  .detail-panel {
+    background: var(--agm-panel-bg);
+    border: 1px solid var(--agm-border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0; /* Crucial para evitar que la tabla ancha rompa el grid */
+    overflow: hidden;
+
+    .detail-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--agm-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap; /* En móviles evita que se empalme el texto con el botón de subida */
+      gap: 12px;
+
+      .header-info {
+        h2 { margin: 0 0 4px 0; font-size: 1.3rem; color: var(--agm-text); }
+        p { margin: 0; font-size: 0.9rem; color: var(--agm-text-soft); }
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   6. RESPONSIVIDAD ESTRICTA
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .master-detail-layout { grid-template-columns: 240px 1fr; }
+}
+
+@media (max-width: 850px) {
+  :host { height: auto; overflow: visible; }
+
+  .master-detail-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .sidebar-list {
+    max-height: 250px; /* Limita la altura de la lista de materias en móvil */
+  }
+
+  .detail-panel {
+    min-height: 450px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  /* Se asegura que en móviles la tabla ocupe su propio espacio de scroll sin estirar el body */
+  .table-container {
+    padding-bottom: 16px;
+  }
+}

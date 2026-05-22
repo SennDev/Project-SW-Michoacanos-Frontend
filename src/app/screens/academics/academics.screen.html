@@ -1,0 +1,184 @@
+<agm-page-header
+  eyebrow="Consola de Operaciones"
+  title="Gestión de Catálogos y Matrículas"
+  description="Administra el directorio institucional, estructura de materias y listas de inscritos.">
+
+  <div class="header-actions">
+    @if (lastUpdated()) {
+      <span class="last-updated">Actualizado: {{ lastUpdated() | date:'shortTime' }}</span>
+    }
+    <button class="btn ghost outline" type="button" (click)="load()">Actualizar Datos</button>
+  </div>
+
+</agm-page-header>
+
+@if (error()) {
+  <agm-error-state [message]="error() ?? 'Ocurrió un error inesperado'" (retry)="load()" />
+}
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="console-wrapper">
+
+    @if (isAdmin()) {
+      <nav class="console-tabs" aria-label="Secciones de administración">
+        <button [class.active]="tab() === 'teachers'" (click)="tab.set('teachers')">Directorio Docente</button>
+        <button [class.active]="tab() === 'subjects'" (click)="tab.set('subjects')">Catálogo de Materias</button>
+        <button [class.active]="tab() === 'students'" (click)="tab.set('students')">Inscripciones y Grupos</button>
+      </nav>
+    }
+
+    <div class="console-content">
+
+      @if (tab() === 'teachers') {
+        <section class="admin-grid">
+          <div class="import-panel">
+            <agm-file-upload-card
+              title="Importar Nómina"
+              hint="Sube el archivo PDF oficial."
+              accept=".pdf"
+              [loading]="importingTeachers()"
+              (fileSelected)="importTeachers($event)" />
+          </div>
+          <div class="table-panel">
+            <div class="table-container">
+              <table class="agm-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre Completo</th>
+                    <th>Correo Institucional</th>
+                    <th>Extensión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (teacher of teachers(); track teacher.id) {
+                    <tr>
+                      <td><strong>{{ teacher.id }}</strong></td>
+                      <td>{{ teacher.nombre }}</td>
+                      <td>{{ teacher.email }}</td>
+                      <td>{{ teacher.extension || 'N/D' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="empty-cell">No hay docentes registrados.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (tab() === 'subjects') {
+        <section class="subjects-grid">
+          @for (subject of subjects(); track subject.id) {
+            <article class="subject-card">
+              <div class="card-header">
+                <strong>NRC: {{ subject.nrc }}</strong>
+                <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+              </div>
+              <h2>{{ subject.nombre }}</h2>
+              <p>{{ subject.docente_nombre || 'Sin docente asignado' }}</p>
+              <div class="card-footer">
+                <small>{{ subject.clave }} | Sec. {{ subject.seccion }}</small>
+                <small>{{ subject.salon || 'Por definir' }}</small>
+              </div>
+            </article>
+          } @empty {
+            <agm-empty-state title="Sin materias registradas" message="Importa un periodo académico desde el módulo correspondiente." />
+          }
+        </section>
+      }
+
+      @if (tab() === 'students') {
+        <section class="master-detail-layout">
+
+          <aside class="sidebar-list">
+            <div class="sidebar-header">
+              <h4>Grupos Disponibles</h4>
+            </div>
+            <div class="sidebar-content">
+              @for (subject of subjects(); track subject.id) {
+                <div class="sidebar-item"
+                     [class.active]="selectedSubjectId() === subject.id"
+                     (click)="selectSubject(subject.id)">
+                  <strong>{{ subject.nombre }}</strong>
+                  <span>NRC: {{ subject.nrc }}</span>
+                </div>
+              } @empty {
+                <p class="muted-text">No hay materias disponibles.</p>
+              }
+            </div>
+          </aside>
+
+          <main class="detail-panel">
+            @if (selectedSubjectId()) {
+              <div class="detail-header">
+                <div class="header-info">
+                  <h2>{{ selectedSubject()?.nombre }}</h2>
+                  <p>{{ students().length }} alumnos inscritos.</p>
+                </div>
+                @if (isAdmin()) {
+                  <agm-file-upload-card
+                    compact="true"
+                    title="Cargar Lista"
+                    hint="PDF"
+                    accept=".pdf"
+                    [loading]="importingStudents()"
+                    (fileSelected)="importStudents($event)" />
+                }
+              </div>
+
+              <div class="table-container">
+                <table class="agm-table">
+                  <thead>
+                    <tr>
+                      <th>Matrícula</th>
+                      <th>Nombre del Alumno</th>
+                      <th>Correo Institucional</th>
+                      @if (isAdmin()) { <th>Operaciones</th> }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (student of students(); track student.id) {
+                      <tr>
+                        <td><strong>{{ student.matricula }}</strong></td>
+                        <td>{{ student.nombre }}</td>
+                        <td>{{ student.email }}</td>
+                        @if (isAdmin()) {
+                          <td>
+                            <button
+                              class="btn small"
+                              [class.danger]="student.status === 'baja_solicitada'"
+                              [class.btn-neutral]="student.status !== 'baja_solicitada'"
+                              (click)="reviewWithdrawal(student)">
+                              Revisar Baja
+                            </button>
+                          </td>
+                        }
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="empty-cell">No hay alumnos inscritos.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <agm-empty-state title="Selecciona un grupo" message="Elige una materia del panel izquierdo." />
+            }
+          </main>
+        </section>
+      }
+    </div>
+  </div>
+
+  <agm-confirmation-modal
+    [open]="studentToWithdraw() !== null"
+    title="Confirmar Solicitud de Baja"
+    [message]="'El/la alumno/a ' + (studentToWithdraw()?.nombre || '') + ' ha solicitado su baja académica. ¿Deseas aprobar y procesar esta baja?'"
+    confirmLabel="Aprobar Baja"
+    confirmTone="danger"
+    (confirm)="confirmWithdrawal()"
+    (cancel)="studentToWithdraw.set(null)" />
+}

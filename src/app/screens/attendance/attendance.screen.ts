@@ -1,21 +1,25 @@
-import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnDestroy, ViewChild, computed, inject, OnInit, signal } from '@angular/core';
-import { SlicePipe } from '@angular/common';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subscription, finalize, interval } from 'rxjs';
+import { SlicePipe, UpperCasePipe, DatePipe } from '@angular/common';
+import { Subscription, forkJoin, interval, of } from 'rxjs';
+import { catchError, delay, finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
 import { AuthService } from '../../core/auth/auth.service';
 import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
-import { errorMessage } from '../../core/utils/error.util';
 import { AcademicsService } from '../../services/academics.service';
 import { AttendanceService } from '../../services/attendance.service';
+import { errorMessage } from '../../core/utils/error.util';
+
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
-import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
-import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
-import { AttendanceRecord, AttendanceSession, QrPayload } from '../../shared/models/attendance.models';
+import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
+import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
+
 import { Student, Subject } from '../../shared/models/academic.models';
+import { AttendanceSession, AttendanceRecord, QrPayload } from '../../shared/models/attendance.models';
 import { TableColumn } from '../../shared/models/ui.models';
 
 interface AttendanceHistoryRow extends AttendanceRecord {
@@ -31,439 +35,68 @@ interface StudentAttendanceSummary {
   percentage: number;
 }
 
-interface BarcodeDetectorResult {
-  rawValue?: string;
-}
-
-interface BarcodeDetectorLike {
-  detect(source: HTMLVideoElement): Promise<BarcodeDetectorResult[]>;
-}
-
+interface BarcodeDetectorResult { rawValue?: string; }
+interface BarcodeDetectorLike { detect(source: HTMLVideoElement): Promise<BarcodeDetectorResult[]>; }
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 
 @Component({
   selector: 'agm-attendance-screen',
   standalone: true,
-  imports: [FormsModule, SlicePipe, PageHeaderComponent, KpiCardComponent, SearchableTableComponent, LoadingSkeletonComponent, EmptyStateComponent],
-  template: `
-    <agm-page-header
-      eyebrow="Asistencias"
-      title="Sesiones QR y registro de asistencia"
-      description="Inicia sesiones, genera QR para alumnos y registra presentes o retardos usando los endpoints REST de ms-attendance."
-    >
-      <button class="btn ghost" type="button" (click)="reload()">Actualizar</button>
-    </agm-page-header>
-
-    @if (loading()) {
-      <agm-loading-skeleton [rows]="6" />
-    } @else {
-      <section class="grid-4">
-        <agm-kpi-card label="Materias" [value]="subjects().length" tone="primary" />
-        <agm-kpi-card label="Sesiones" [value]="sessionCount()" tone="warning" />
-        <agm-kpi-card label="Asistencia" [value]="attendanceRate() + '%'" [tone]="attendanceRate() >= 80 ? 'success' : 'warning'" />
-        <agm-kpi-card label="Retardos" [value]="lateCount()" tone="warning" />
-      </section>
-
-      <section class="attendance-stage">
-        <div>
-          <span class="status-badge" [class]="activeSessionTone()">
-            {{ activeSessionLabel() }}
-          </span>
-          <h2>{{ activeSession() ? 'Sesion #' + activeSession()?.session_id : 'Control QR listo para iniciar' }}</h2>
-          <p>
-            El backend mantiene sesiones temporales y tokens firmados. Docentes inician la sesion y registran el token;
-            alumnos generan su QR con el ID de sesion activo.
-          </p>
-          <span class="sync-line">
-            <span class="sync-dot" aria-hidden="true"></span>
-            {{ syncLabel() }}
-          </span>
-        </div>
-        <div class="session-display">
-          <span>ID de sesion</span>
-          <strong>{{ activeSession()?.session_id || '--' }}</strong>
-          <small>{{ sessionWindowLabel() }}</small>
-        </div>
-      </section>
-
-      <section class="grid-3" style="margin-top: 18px;">
-        <article class="panel pad interactive">
-          <h2 class="panel-title">Materia</h2>
-          <div class="field">
-            <label>Selecciona una materia</label>
-            <select [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
-              <option [ngValue]="null">Sin seleccion</option>
-              @for (subject of subjects(); track subject.id) {
-                <option [ngValue]="subject.id">{{ subject.nrc }} - {{ subject.nombre }}</option>
-              }
-            </select>
-          </div>
-          @if (selectedSubject()) {
-            <div class="divider"></div>
-            <strong>{{ selectedSubject()?.nombre }}</strong>
-            <p class="muted">{{ selectedSubject()?.docente_nombre || 'Docente pendiente' }}</p>
-          }
-        </article>
-
-        @if (canManage()) {
-          <article class="panel pad interactive">
-            <h2 class="panel-title">Control docente</h2>
-            <div class="stack">
-              <button class="btn primary" type="button" [disabled]="starting()" (click)="startSession()">
-                {{ starting() ? 'Iniciando...' : 'Iniciar sesion QR' }}
-              </button>
-              @if (activeSession()) {
-                <div class="teacher-session-card">
-                  <strong>Comparte el ID {{ activeSession()?.session_id }}</strong>
-                  <span>{{ isSessionExpired() ? 'La ventana ya vencio; cierra la sesion o inicia una nueva.' : 'La sesion sigue disponible para validar QR.' }}</span>
-                </div>
-              }
-              <div class="field">
-                <label>Token QR escaneado</label>
-                <textarea rows="4" [(ngModel)]="qrToken" placeholder="Pega aqui el token del alumno"></textarea>
-              </div>
-              <button class="btn ghost" type="button" [disabled]="registering() || !qrToken.trim()" (click)="registerAttendance()">
-                {{ registering() ? 'Registrando...' : 'Registrar asistencia' }}
-              </button>
-              <button class="btn ghost" type="button" [disabled]="scannerStarting()" (click)="scannerActive() ? stopScanner() : startScanner()">
-                {{ scannerActive() ? 'Detener camara' : scannerStarting() ? 'Abriendo camara...' : 'Escanear con camara' }}
-              </button>
-              @if (scannerMessage()) {
-                <span class="scanner-message" [class.error]="scannerError()">{{ scannerMessage() }}</span>
-              }
-              @if (activeSession()) {
-                <button class="btn danger" type="button" (click)="closeSession(activeSession()!)">Cerrar sesion activa</button>
-              }
-            </div>
-          </article>
-        }
-
-        @if (isStudent()) {
-          <article class="panel pad interactive qr-card">
-            <h2 class="panel-title">Mi QR</h2>
-            <div class="field">
-              <label>ID de sesion activa</label>
-              <input type="number" [(ngModel)]="studentSessionId">
-            </div>
-            <button class="btn primary" type="button" [disabled]="generatingQr()" (click)="generateQr()">Generar QR</button>
-            @if (qrPayload()) {
-              <div class="qr-frame">
-                <img class="qr-image" [src]="'data:image/png;base64,' + qrPayload()?.qr_png_base64" alt="QR de asistencia">
-                <span class="status-badge success">QR generado</span>
-              </div>
-              <textarea rows="3" readonly [value]="qrPayload()?.token"></textarea>
-            }
-          </article>
-        }
-
-        <article class="panel pad interactive">
-          <h2 class="panel-title">Sesiones recientes</h2>
-          @if (sessions().length) {
-            <div class="metric-list">
-              @for (session of sessions(); track session.session_id) {
-                <div class="metric-row">
-                  <span>#{{ session.session_id }} | {{ session.closes_at | slice:0:16 }}</span>
-                  @if (canManage()) {
-                    <button class="btn ghost small" type="button" [disabled]="session.status === 'cerrada'" (click)="closeSession(session)">Cerrar</button>
-                  } @else {
-                    <span class="status-badge" [class]="session.status === 'cerrada' ? 'neutral' : 'success'">{{ session.status }}</span>
-                  }
-                </div>
-              }
-            </div>
-          } @else {
-            <agm-empty-state title="Sin sesiones locales" message="El backend no expone listado de sesiones; AGM conserva las creadas desde este navegador." />
-          }
-        </article>
-      </section>
-
-      @if (canManage() && scannerVisible()) {
-        <section class="panel pad scanner-panel" style="margin-top: 18px;">
-          <div class="row between wrap">
-            <div>
-              <h2 class="panel-title">Camara QR</h2>
-              <p class="muted">Acerca el QR del alumno al marco. Tambien puedes seguir usando la captura manual.</p>
-            </div>
-            <span class="status-badge" [class]="scannerActive() ? 'success' : scannerError() ? 'danger' : 'warning'">
-              {{ scannerActive() ? 'Escaneando' : scannerError() ? 'Revisar permiso' : 'Preparando' }}
-            </span>
-            <button class="btn ghost small" type="button" (click)="stopScanner()">Cerrar</button>
-          </div>
-          <div class="scanner-steps" aria-label="Estado de escaneo QR">
-            <span [class.active]="scannerStarting() || scannerActive()">1. Permiso de camara</span>
-            <span [class.active]="scannerActive()">2. Enfoca el QR</span>
-            <span [class.active]="qrToken.trim()">3. Token listo</span>
-          </div>
-          <div class="scanner-frame">
-            <video #scannerVideo autoplay muted playsinline aria-label="Vista previa de la camara"></video>
-            <span aria-hidden="true"></span>
-          </div>
-        </section>
-      }
-
-      <section class="grid-2" style="margin-top: 18px;">
-        <article class="panel pad">
-          <h2 class="panel-title">{{ isStudent() ? 'Mi asistencia' : 'Resumen del grupo' }}</h2>
-          <div class="metric-list">
-            <div class="metric-row"><span>Sesiones registradas</span><strong>{{ sessionCount() }}</strong></div>
-            <div class="metric-row"><span>Asistencia global</span><strong>{{ attendanceRate() }}%</strong></div>
-            <div class="metric-row"><span>Faltas estimadas</span><strong>{{ absenceCount() }}</strong></div>
-            <div class="metric-row"><span>Alumnos bajo 80%</span><strong>{{ lowAttendanceCount() }}</strong></div>
-          </div>
-        </article>
-
-        <article class="panel pad">
-          <h2 class="panel-title">Seguimiento</h2>
-          @if (studentSummaries().length) {
-            <div class="attendance-summary-list">
-              @for (item of studentSummaries().slice(0, 6); track item.student.id) {
-                <div>
-                  <div class="row between">
-                    <strong>{{ item.student.nombre }}</strong>
-                    <span class="status-badge" [class]="item.percentage >= 80 ? 'success' : item.percentage >= 70 ? 'warning' : 'danger'">
-                      {{ item.percentage }}%
-                    </span>
-                  </div>
-                  <div class="progress"><span [style.--value]="item.percentage + '%'"></span></div>
-                  <small>{{ item.present }} presentes | {{ item.late }} retardos | {{ item.absences }} faltas</small>
-                </div>
-              }
-            </div>
-          } @else {
-            <agm-empty-state title="Sin historial suficiente" message="Los porcentajes aparecen cuando existan sesiones y registros para la materia." />
-          }
-        </article>
-      </section>
-
-      <section style="margin-top: 18px;">
-        <agm-searchable-table
-          [rows]="historyRows()"
-          [columns]="historyColumns"
-          placeholder="Buscar por alumno, sesion o estado"
-          emptyTitle="Sin asistencias"
-          emptyMessage="Cuando se registren QR para esta materia apareceran aqui."
-        />
-      </section>
-    }
-  `,
-  styles: [`
-    .attendance-stage {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 220px;
-      gap: 18px;
-      align-items: center;
-      margin-top: 18px;
-      padding: 22px;
-      border: 1px solid color-mix(in srgb, var(--agm-secondary) 22%, var(--agm-border));
-      border-radius: var(--agm-radius-lg);
-      background:
-        linear-gradient(135deg, color-mix(in srgb, var(--agm-primary-soft) 78%, white), var(--agm-surface));
-      box-shadow: var(--agm-shadow-soft);
-    }
-
-    .attendance-stage h2 {
-      margin: 12px 0 8px;
-      font-size: clamp(1.45rem, 3vw, 2.2rem);
-      line-height: 1.1;
-      letter-spacing: 0;
-    }
-
-    .attendance-stage p {
-      max-width: 820px;
-      margin: 0;
-      color: var(--agm-text-soft);
-      line-height: 1.65;
-    }
-
-    .session-display {
-      display: grid;
-      place-items: center;
-      gap: 4px;
-      min-height: 150px;
-      border-radius: var(--agm-radius);
-      color: white;
-      background: linear-gradient(145deg, var(--agm-primary), var(--agm-secondary));
-      box-shadow: var(--agm-shadow-soft);
-      text-align: center;
-    }
-
-    .session-display span,
-    .session-display small {
-      color: rgba(255, 255, 255, 0.72);
-      font-weight: 750;
-    }
-
-    .session-display strong {
-      font-size: 3rem;
-      line-height: 1;
-    }
-
-    .teacher-session-card {
-      display: grid;
-      gap: 5px;
-      padding: 13px;
-      border-radius: var(--agm-radius-sm);
-      background: var(--agm-accent-soft);
-      color: var(--agm-text);
-    }
-
-    .teacher-session-card span {
-      color: var(--agm-text-soft);
-      font-size: 0.84rem;
-      line-height: 1.45;
-    }
-
-    .scanner-message {
-      color: var(--agm-text-soft);
-      font-size: var(--agm-font-size-sm);
-    }
-
-    .scanner-message.error {
-      color: var(--agm-danger);
-    }
-
-    .scanner-panel {
-      display: grid;
-      gap: 16px;
-    }
-
-    .scanner-panel p {
-      margin: 4px 0 0;
-    }
-
-    .scanner-steps {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-    }
-
-    .scanner-steps span {
-      min-height: 34px;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius-sm);
-      color: var(--agm-text-soft);
-      background: var(--agm-surface-muted);
-      font-size: var(--agm-font-size-sm);
-      font-weight: 800;
-      text-align: center;
-    }
-
-    .scanner-steps span.active {
-      color: var(--agm-primary);
-      border-color: color-mix(in srgb, var(--agm-primary) 34%, var(--agm-border));
-      background: var(--agm-primary-soft);
-    }
-
-    .scanner-frame {
-      position: relative;
-      overflow: hidden;
-      min-height: 280px;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius);
-      background: color-mix(in srgb, var(--agm-bg) 85%, #020617);
-    }
-
-    .scanner-frame video {
-      width: 100%;
-      min-height: 280px;
-      max-height: 420px;
-      object-fit: cover;
-    }
-
-    .scanner-frame span {
-      position: absolute;
-      inset: 14%;
-      border: 2px solid rgba(255, 255, 255, 0.86);
-      border-radius: var(--agm-radius);
-      box-shadow: 0 0 0 999px rgba(2, 6, 23, 0.34);
-    }
-
-    .qr-card textarea {
-      margin-top: 12px;
-    }
-
-    .qr-frame {
-      display: grid;
-      place-items: center;
-      gap: 10px;
-      margin-top: 14px;
-      padding: 16px;
-      border-radius: var(--agm-radius);
-      background:
-        linear-gradient(180deg, var(--agm-surface), var(--agm-primary-soft));
-    }
-
-    .qr-image {
-      width: 180px;
-      height: 180px;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius);
-      background: white;
-      padding: 10px;
-    }
-
-    .attendance-summary-list {
-      display: grid;
-      gap: 14px;
-    }
-
-    .attendance-summary-list > div {
-      display: grid;
-      gap: 7px;
-    }
-
-    .attendance-summary-list small {
-      color: var(--agm-text-soft);
-    }
-
-    @media (max-width: 720px) {
-      .attendance-stage {
-        grid-template-columns: 1fr;
-      }
-
-      .scanner-steps {
-        grid-template-columns: 1fr;
-      }
-    }
-  `]
+  imports: [
+    PageHeaderComponent, LoadingSkeletonComponent, EmptyStateComponent,
+    FormsModule, KpiCardComponent, SearchableTableComponent, SlicePipe, UpperCasePipe, DatePipe
+  ],
+  templateUrl: './attendance.screen.html',
+  styleUrl: './attendance.screen.scss'
 })
 export class AttendanceScreen implements OnInit, OnDestroy {
   @ViewChild('scannerVideo') scannerVideo?: ElementRef<HTMLVideoElement>;
 
   private readonly destroyRef = inject(DestroyRef);
-  private readonly auth = inject(AuthService);
+  public readonly auth = inject(AuthService);
   private readonly subjectScope = inject(SubjectScopeService);
   private readonly academics = inject(AcademicsService);
   private readonly attendance = inject(AttendanceService);
   private readonly toasts = inject(ToastService);
   private readonly cdr = inject(ChangeDetectorRef);
 
+  // --- Estados Principales ---
   readonly loading = signal(true);
   readonly starting = signal(false);
   readonly registering = signal(false);
   readonly generatingQr = signal(false);
   readonly syncing = signal(false);
+
   readonly lastSyncedAt = signal<Date | null>(null);
   readonly scannerVisible = signal(false);
   readonly scannerActive = signal(false);
   readonly scannerStarting = signal(false);
   readonly scannerMessage = signal('');
   readonly scannerError = signal(false);
+
   readonly subjects = signal<Subject[]>([]);
   readonly selectedSubjectId = signal<number | null>(null);
+
+  readonly activeSession = signal<any | null>(null);
   readonly sessions = signal<AttendanceSession[]>([]);
   readonly history = signal<AttendanceRecord[]>([]);
   readonly students = signal<Student[]>([]);
   readonly qrPayload = signal<QrPayload | null>(null);
 
+  readonly rightPanelTab = signal<'live' | 'history'>('live');
+
   qrToken = '';
   studentSessionId: number | null = null;
+  readonly qrTimeLeft = signal(0);
+
   private pollSubscription?: Subscription;
+  private qrInterval: any;
   private scannerStream?: MediaStream;
   private scannerFrameId?: number;
   private detector?: BarcodeDetectorLike;
+
+  readonly isTeacher = computed(() => this.auth.role() === 'admin' || this.auth.role() === 'docente');
+  readonly isStudent = computed(() => this.auth.role() === 'alumno');
 
   readonly visibleHistory = computed(() => {
     const user = this.auth.user();
@@ -493,8 +126,8 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     const totalSessions = sessionIds.size;
     return this.visibleStudents().map((student) => {
       const records = this.visibleHistory().filter((record) => record.student_id === student.id);
-      const present = records.filter((record) => record.estado === 'Presente').length;
-      const late = records.filter((record) => record.estado === 'Retardo').length;
+      const present = records.filter((record) => record.estado === 'Presente' || (record as any).status === 'presente').length;
+      const late = records.filter((record) => record.estado === 'Retardo' || (record as any).status === 'retardo').length;
       const absences = Math.max(0, totalSessions - present - late);
       const percentage = totalSessions ? Math.round(((present + late) / totalSessions) * 100) : 0;
       return { student, present, late, absences, percentage };
@@ -502,12 +135,33 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   });
 
   readonly historyColumns: TableColumn<AttendanceHistoryRow>[] = [
-    { key: 'session_id', header: 'Sesion' },
-    { key: 'matricula', header: 'Matricula' },
+    { key: 'session_id', header: 'Sesión' },
+    { key: 'matricula', header: 'Matrícula' },
     { key: 'student_name', header: 'Alumno' },
     { key: 'estado', header: 'Estado', badge: (row) => row.estado },
-    { key: 'registered_at', header: 'Registrado', formatter: (row) => new Date(row.registered_at).toLocaleString() }
+    { key: 'registered_at', header: 'Registrado', formatter: (row) => new Date(row.registered_at || (row as any).created_at).toLocaleString() }
   ];
+
+  readonly liveRoster = computed(() => {
+    const list = this.students();
+    const session = this.activeSession();
+    if (!session) return list.map(s => ({ ...s, status: 'AUSENTE', tone: 'danger' }));
+
+    return list.map(s => {
+      const record = this.visibleHistory().find(r => r.session_id === session.session_id && r.student_id === s.id);
+      return {
+        ...s,
+        status: record ? 'PRESENTE' : 'AUSENTE',
+        tone: record ? 'success' : 'danger'
+      };
+    });
+  });
+
+  readonly presentCount = computed(() => this.liveRoster().filter(s => s.status === 'PRESENTE').length);
+
+  // --- Temporizador Global Docente ---
+  readonly timeLeftLabel = signal('10:00');
+  private timerSub?: Subscription;
 
   ngOnInit(): void {
     this.reload();
@@ -516,91 +170,52 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.pollSubscription?.unsubscribe();
     this.stopScanner();
-  }
-
-  isStudent(): boolean {
-    return this.auth.role() === 'alumno';
-  }
-
-  canManage(): boolean {
-    return this.auth.role() === 'admin' || this.auth.role() === 'docente';
-  }
-
-  selectedSubject(): Subject | undefined {
-    return this.subjects().find((subject) => subject.id === this.selectedSubjectId());
-  }
-
-  activeSession(): AttendanceSession | undefined {
-    return this.sessions().find((session) => session.status !== 'cerrada') ?? this.sessions()[0];
-  }
-
-  activeSessionTone(): 'success' | 'warning' | 'neutral' {
-    if (!this.activeSession()) {
-      return 'neutral';
-    }
-    return this.isSessionExpired() ? 'warning' : 'success';
-  }
-
-  activeSessionLabel(): string {
-    if (!this.activeSession()) {
-      return 'Sin sesion local activa';
-    }
-    return this.isSessionExpired() ? 'Sesion expirada' : 'Sesion activa';
+    this.clearQrTimer();
+    if (this.timerSub) this.timerSub.unsubscribe();
   }
 
   sessionCount(): number {
     return new Set(this.visibleHistory().map((record) => record.session_id)).size || this.sessions().length;
   }
 
-  lateCount(): number {
-    return this.visibleHistory().filter((record) => record.estado === 'Retardo').length;
-  }
-
   attendanceRate(): number {
     const summaries = this.studentSummaries();
-    if (!summaries.length) {
-      return 0;
-    }
+    if (!summaries.length) return 0;
     return Math.round(summaries.reduce((sum, item) => sum + item.percentage, 0) / summaries.length);
   }
 
-  absenceCount(): number {
-    return this.studentSummaries().reduce((sum, item) => sum + item.absences, 0);
-  }
+  // --- Formato de Fecha y Duración 10 minutos ---
+  activeSessionDateLabel(): string {
+    const session = this.activeSession();
+    if (!session) return '';
 
-  lowAttendanceCount(): number {
-    return this.studentSummaries().filter((item) => item.percentage < 80).length;
-  }
+    const start = new Date((session as any).created_at || (session as any).creado_en || Date.now());
+    const closesAt = new Date(start.getTime() + 600000); // 10 minutos
 
-  isSessionExpired(): boolean {
-    const closesAt = this.activeSession()?.closes_at;
-    return Boolean(closesAt && new Date(closesAt).getTime() <= Date.now());
-  }
+    const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+    const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
 
-  sessionWindowLabel(): string {
-    const closesAt = this.activeSession()?.closes_at;
-    if (!closesAt) {
-      return 'Cierre pendiente';
-    }
-    return `${this.isSessionExpired() ? 'Vencio' : 'Cierra'}: ${closesAt.slice(0, 16)}`;
-  }
+    const dateStr = start.toLocaleDateString('es-MX', dateOpts);
+    const startStr = start.toLocaleTimeString('es-MX', timeOpts);
+    const endStr = closesAt.toLocaleTimeString('es-MX', timeOpts);
 
-  syncLabel(): string {
-    if (this.syncing()) {
-      return 'Sincronizando asistencia...';
-    }
-    const syncedAt = this.lastSyncedAt();
-    return syncedAt ? `Sincronizado ${syncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Esperando sincronizacion';
+    return `${dateStr}, de ${startStr} a ${endStr}`;
   }
 
   reload(): void {
     this.loading.set(true);
+    const currentActiveSession = this.activeSession();
+
     this.subjectScope.listVisibleSubjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (subjects) => {
-        this.subjects.set(subjects);
-        const initial = this.selectedSubjectId() ?? subjects[0]?.id ?? null;
+        const sortedSubs = subjects.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        this.subjects.set(sortedSubs);
+
+        const initial = this.selectedSubjectId() ?? sortedSubs[0]?.id ?? null;
         this.selectedSubjectId.set(initial);
+
         if (initial) {
+          if (currentActiveSession) this.activeSession.set(currentActiveSession);
           this.loadAttendance(initial, true);
           this.startPolling(initial);
         } else {
@@ -608,7 +223,7 @@ export class AttendanceScreen implements OnInit, OnDestroy {
         }
       },
       error: (error: unknown) => {
-        this.toasts.error('No se cargaron materias', errorMessage(error));
+        this.toasts.error('Error', errorMessage(error));
         this.loading.set(false);
       }
     });
@@ -617,6 +232,9 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   selectSubject(id: number | null): void {
     this.selectedSubjectId.set(id);
     this.qrPayload.set(null);
+    this.activeSession.set(null);
+    this.clearQrTimer();
+
     if (id) {
       this.loadAttendance(id);
       this.startPolling(id);
@@ -664,124 +282,203 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   private loadStudents(subjectId: number, finishLoading = false): void {
     this.academics.listStudentsBySubject(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (students) => {
-        this.students.set(students);
-        if (finishLoading) {
-          this.loading.set(false);
-        }
+        this.students.set(students.sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        if (finishLoading) this.loading.set(false);
       },
       error: () => {
         this.students.set([]);
-        if (finishLoading) {
-          this.loading.set(false);
-        }
+        if (finishLoading) this.loading.set(false);
       }
     });
   }
 
+  // --- FLUJO DOCENTE ---
   startSession(): void {
     const subjectId = this.selectedSubjectId();
-    if (!subjectId) {
-      this.toasts.warning('Selecciona una materia');
-      return;
-    }
+    if (!subjectId) return this.toasts.warning('Selecciona una materia');
+
     this.starting.set(true);
+
+    // Conexión real, sin mocks falsos
     this.attendance.startSession(subjectId).pipe(
       finalize(() => this.starting.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (session) => {
-        this.toasts.success('Sesion iniciada', `ID ${session.session_id}`);
-        this.studentSessionId = session.session_id;
+      next: (session: any) => {
+        this.toasts.success('Sesión iniciada', `ID ${session.session_id}. Díctale este ID a los alumnos.`);
+        this.setActiveSession(session);
         this.sessions.set(this.attendance.getLocalSessions(subjectId));
       },
-      error: (error: unknown) => this.toasts.error('No se inicio la sesion', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Error', errorMessage(error))
+    });
+  }
+
+  private setActiveSession(session: any | null): void {
+    this.activeSession.set(session);
+    if (this.timerSub) this.timerSub.unsubscribe();
+
+    if (session) {
+      this.timerSub = interval(1000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+        const createdAt = new Date(session.created_at || session.creado_en || Date.now()).getTime();
+        const expiresAt = createdAt + 600000; // 10 Minutos exactos
+        const diff = expiresAt - Date.now();
+
+        if (diff <= 0) {
+          this.closeSession();
+        } else {
+          const m = Math.floor(diff / 60000).toString().padStart(2, '0');
+          const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+          this.timeLeftLabel.set(`${m}:${s}`);
+        }
+      });
+    } else {
+      this.timeLeftLabel.set('00:00');
+    }
+  }
+
+  closeSession(): void {
+    const session = this.activeSession();
+    if (!session) return;
+    const subjectId = this.selectedSubjectId();
+    this.loading.set(true);
+
+    // Conexión real, sin mocks falsos
+    this.attendance.closeSession(session.session_id || session.id).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: () => {
+        this.toasts.success('Sesión cerrada correctamente');
+        this.activeSession.set(null);
+        this.stopScanner();
+        if (this.timerSub) this.timerSub.unsubscribe();
+
+        if (subjectId) {
+          this.sessions.set(this.attendance.getLocalSessions(subjectId));
+          this.loadAttendance(subjectId, true);
+        } else {
+          this.loading.set(false);
+        }
+      },
+      error: (error: unknown) => {
+        this.toasts.error('Error al cerrar', errorMessage(error));
+        this.loading.set(false);
+      }
     });
   }
 
   registerAttendance(): void {
-    if (!this.qrToken.trim()) {
-      this.toasts.warning('Pega un token QR');
-      return;
-    }
+    if (!this.qrToken.trim()) return this.toasts.warning('Pega un token QR');
+
     const subjectId = this.selectedSubjectId();
     this.registering.set(true);
+
+    // Conexión real, sin mocks falsos
     this.attendance.registerAttendance(this.qrToken.trim()).pipe(
       finalize(() => this.registering.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (result) => {
-        this.toasts.success('Asistencia registrada', result.estado);
-        this.qrToken = '';
-        if (subjectId) {
-          this.loadAttendance(subjectId);
-        }
-      },
-      error: (error: unknown) => this.toasts.error('No se registro asistencia', errorMessage(error))
-    });
-  }
-
-  closeSession(session: AttendanceSession): void {
-    const subjectId = this.selectedSubjectId();
-    this.attendance.closeSession(session.session_id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.toasts.success('Sesion cerrada');
-        if (subjectId) {
-          this.sessions.set(this.attendance.getLocalSessions(subjectId));
-        }
+        this.toasts.success('Asistencia Registrada', 'El alumno fue marcado como presente.');
+        this.qrToken = '';
+        if (subjectId) this.loadAttendance(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('No se cerro la sesion', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Error', errorMessage(error))
     });
   }
 
+  // --- FLUJO ALUMNO (QR Dinámico 15 Segundos) ---
   generateQr(): void {
     const subjectId = this.selectedSubjectId();
     if (!subjectId || !this.studentSessionId) {
-      this.toasts.warning('Selecciona materia y sesion');
-      return;
+      return this.toasts.warning('Falta Información', 'Ingresa el ID de sesión proporcionado por tu docente.');
     }
+    this.fetchQrPayload();
+  }
+
+  private fetchQrPayload(): void {
+    const subjectId = this.selectedSubjectId()!;
     this.generatingQr.set(true);
+
+    // Conexión real, sin mocks falsos
     this.attendance.generateQr(subjectId, Number(this.studentSessionId)).pipe(
       finalize(() => this.generatingQr.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (payload) => this.qrPayload.set(payload),
-      error: (error: unknown) => this.toasts.error('No se genero QR', errorMessage(error))
+      next: (payload) => {
+        this.qrPayload.set(payload as QrPayload);
+        this.startQrTimer();
+      },
+      error: (error: unknown) => {
+        // Limpiamos el ID introducido para que el alumno intente de nuevo
+        this.studentSessionId = null;
+        this.toasts.error('Error', errorMessage(error));
+      }
     });
   }
 
+  private startQrTimer(): void {
+    this.clearQrTimer();
+    this.qrTimeLeft.set(15);
+
+    this.qrInterval = setInterval(() => {
+      const current = this.qrTimeLeft() - 1;
+      if (current <= 0) {
+        this.clearQrTimer();
+        this.fetchQrPayload();
+      } else {
+        this.qrTimeLeft.set(current);
+      }
+    }, 1000);
+  }
+
+  private clearQrTimer(): void {
+    if (this.qrInterval) {
+      clearInterval(this.qrInterval);
+      this.qrInterval = null;
+    }
+  }
+
+  // --- ESCÁNER ORIGINAL INTACTO CON FALLBACK ROBUSTO ---
   async startScanner(): Promise<void> {
     const Detector = (window as Window & typeof globalThis & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      this.setScannerMessage('Este navegador no permite abrir la camara.', true);
-      return;
-    }
-    if (!Detector) {
-      this.setScannerMessage('El navegador no soporta lectura QR automatica; usa captura manual.', true);
-      return;
-    }
+    if (!navigator.mediaDevices?.getUserMedia) return this.setScannerMessage('Tu navegador deniega el acceso a la cámara.', true);
 
     this.scannerVisible.set(true);
     this.scannerStarting.set(true);
     this.scannerError.set(false);
-    this.scannerMessage.set('Solicitando permiso de camara...');
+    this.scannerMessage.set('Solicitando permisos...');
     this.cdr.detectChanges();
 
     try {
-      this.scannerStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false
-      });
+      try {
+        this.scannerStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: 'environment' } },
+          audio: false
+        });
+      } catch (e) {
+        this.scannerStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
       await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
       const video = this.scannerVideo?.nativeElement;
-      if (!video) {
-        throw new Error('No se encontro la vista previa de la camara.');
-      }
+      if (!video) throw new Error('No se encontró la vista previa de la cámara.');
+
       video.srcObject = this.scannerStream;
       await video.play();
-      this.detector = new Detector({ formats: ['qr_code'] });
-      this.scannerActive.set(true);
-      this.setScannerMessage('Camara activa. Escanea un QR valido.', false);
-      this.scanFrame();
+
+      if (Detector) {
+        this.detector = new Detector({ formats: ['qr_code'] });
+        this.scannerActive.set(true);
+        this.setScannerMessage('Cámara activa. Escanea un QR válido.', false);
+        this.scanFrame();
+      } else {
+        this.scannerActive.set(true);
+        this.setScannerMessage('Dispositivo sin Auto-Escaneo. Usa la cámara de apoyo visual y captura manual.', false);
+      }
+
     } catch (error: unknown) {
       this.setScannerMessage(this.cameraErrorMessage(error), true);
       this.stopScanner(false);
@@ -799,31 +496,28 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     this.scannerStream = undefined;
     this.detector = undefined;
     this.scannerActive.set(false);
-    if (hide) {
-      this.scannerVisible.set(false);
-    }
+    if (hide) this.scannerVisible.set(false);
   }
 
   private scanFrame(): void {
     const video = this.scannerVideo?.nativeElement;
-    if (!video || !this.detector || !this.scannerActive()) {
-      return;
-    }
+    if (!video || !this.detector || !this.scannerActive()) return;
+
     void this.detector.detect(video).then((codes) => {
       const rawValue = codes.find((code) => code.rawValue)?.rawValue?.trim();
       const token = rawValue ? this.normalizeScannedToken(rawValue) : null;
+
       if (token) {
         this.qrToken = token;
-        this.setScannerMessage('QR detectado. Token listo para registrar.', false);
-        this.stopScanner();
+        this.setScannerMessage('¡QR Detectado! Presiona Confirmar.', false);
+        this.stopScanner(false);
         return;
       }
       if (rawValue) {
-        this.setScannerMessage('El QR detectado no pertenece a AGM. Intenta con el codigo de asistencia.', true);
+        this.setScannerMessage('El QR no es compatible con el sistema.', true);
       }
       this.scannerFrameId = requestAnimationFrame(() => this.scanFrame());
     }).catch(() => {
-      this.setScannerMessage('No fue posible leer el QR. Intenta acercarlo o usa captura manual.', true);
       this.scannerFrameId = requestAnimationFrame(() => this.scanFrame());
     });
   }
@@ -842,7 +536,6 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     } catch {
       token = value;
     }
-
     const clean = token.replace(/\s+/g, '');
     try {
       const padded = clean.padEnd(clean.length + ((4 - clean.length % 4) % 4), '=');
@@ -856,15 +549,9 @@ export class AttendanceScreen implements OnInit, OnDestroy {
 
   private cameraErrorMessage(error: unknown): string {
     const name = error instanceof DOMException ? error.name : '';
-    if (name === 'NotAllowedError' || name === 'SecurityError') {
-      return 'Permiso de camara denegado. Habilitalo en el navegador o usa captura manual.';
-    }
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-      return 'No se encontro una camara disponible. Usa captura manual del token.';
-    }
-    if (name === 'NotReadableError') {
-      return 'La camara esta ocupada por otra aplicacion. Cierra esa app e intenta de nuevo.';
-    }
-    return errorMessage(error, 'No se pudo abrir la camara.');
+    if (name === 'NotAllowedError' || name === 'SecurityError') return 'Permiso de cámara denegado en tu navegador.';
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No se detectó ninguna cámara instalada.';
+    if (name === 'NotReadableError') return 'La cámara está siendo usada por otra aplicación.';
+    return errorMessage(error, 'Fallo de hardware al abrir la cámara.');
   }
 }

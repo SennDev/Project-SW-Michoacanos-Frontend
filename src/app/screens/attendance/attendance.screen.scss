@@ -1,0 +1,277 @@
+/* ==========================================================================
+   1. CORE: LAYOUT Y DARK MODE COMPATIBLE
+   ========================================================================== */
+:host {
+  display: block;
+  min-height: calc(100vh - 84px);
+  background-color: var(--agm-bg, #f8fafc);
+  box-sizing: border-box;
+  color: var(--agm-text);
+}
+
+.last-sync-text {
+  font-size: 0.85rem;
+  color: var(--agm-text-soft);
+  font-weight: 500;
+}
+
+.attendance-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 24px 40px 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   2. SELECTOR DE MATERIAS LISTA
+   ========================================================================== */
+.subject-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: var(--agm-panel-bg);
+  padding: 16px 20px;
+  border-radius: var(--agm-radius-lg);
+  border: 1px solid var(--agm-border);
+  box-shadow: var(--agm-shadow-soft);
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--agm-text-soft);
+  }
+
+  .agm-select {
+    width: 100%;
+    max-width: 400px;
+    padding: 12px 16px;
+    font-size: 1.05rem;
+    border: 1px solid var(--agm-border-strong);
+    border-radius: var(--agm-radius-sm);
+    background-color: var(--agm-surface);
+    color: var(--agm-text);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      border-color: var(--agm-primary);
+      box-shadow: 0 0 0 3px var(--agm-primary-soft);
+    }
+  }
+}
+
+/* ==========================================================================
+   3. LAYOUT PRINCIPAL (GRILLA)
+   ========================================================================== */
+.attendance-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+.ops-panel {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   4. TARJETAS OPERATIVAS (Scanner y QR)
+   ========================================================================== */
+.ops-card {
+  background: var(--agm-panel-bg);
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius-lg);
+  padding: 24px;
+  box-shadow: var(--agm-shadow-soft);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .panel-title {
+    margin: 0 0 20px 0;
+    font-size: 1.25rem;
+    color: var(--agm-text);
+    border-bottom: 1px solid var(--agm-border);
+    padding-bottom: 12px;
+  }
+
+  .idle-message {
+    text-align: center;
+    padding: 20px 0;
+    p { margin: 0 0 20px 0; color: var(--agm-text-soft); font-size: 0.95rem; line-height: 1.5; }
+  }
+}
+
+/* --- Estado Activo Sesión --- */
+.active-session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--agm-surface-muted);
+  border: 1px solid var(--agm-border);
+  padding: 16px;
+  border-radius: var(--agm-radius-sm);
+  margin-bottom: 20px;
+
+  .info-group {
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+    .session-date { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 500;}
+  }
+
+  .timer-countdown {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--agm-text);
+    text-align: center;
+    background: var(--agm-surface);
+    padding: 6px 0;
+    border-radius: 6px;
+    border: 1px dashed var(--agm-border-strong);
+  }
+}
+
+/* --- Scanner Docente --- */
+.scanner-section {
+  display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;
+
+  .scanner-frame {
+    position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: var(--agm-radius-sm); overflow: hidden; display: flex; justify-content: center; align-items: center;
+    video { width: 100%; height: 100%; object-fit: cover; }
+    .scan-target { position: absolute; inset: 15%; border: 2px solid rgba(255,255,255,0.8); border-radius: 12px; box-shadow: 0 0 0 999px rgba(0,0,0,0.4); }
+  }
+
+  .status-text { font-size: 0.85rem; color: var(--agm-text-soft); text-align: center; margin: 0; font-weight: 600;}
+  .danger-text { color: var(--agm-danger); }
+}
+
+.manual-section {
+  display: flex; flex-direction: column; gap: 8px;
+  label { font-size: 0.85rem; font-weight: 600; color: var(--agm-text-soft); }
+}
+
+/* --- Ingreso Alumno --- */
+.session-input-wrapper {
+  display: flex; flex-direction: column; gap: 8px;
+  label { font-size: 0.85rem; font-weight: 600; color: var(--agm-text-soft); }
+}
+
+.input-group {
+  display: flex; gap: 8px;
+  input { flex: 1; min-width: 0; padding: 10px 12px; font-size: 1rem; background: var(--agm-surface); border: 1px solid var(--agm-border-strong); color: var(--agm-text); border-radius: var(--agm-radius-sm); outline: none; transition: border-color 0.2s; }
+  input:focus { border-color: var(--agm-primary); }
+}
+
+/* --- QR Alumno --- */
+.qr-card {
+  align-items: center;
+
+  .qr-display-box {
+    display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px;
+    padding: 20px; background: white; border-radius: 16px; border: 2px solid var(--agm-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+
+    .qr-image { width: 200px; height: 200px; object-fit: contain; }
+    .timer-badge { background: var(--agm-primary); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; }
+  }
+
+  .token-display {
+    width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: center;
+    label { font-size: 0.85rem; color: var(--agm-text-soft); font-weight: 600;}
+    input { text-align: center; padding: 12px; font-size: 1.1rem; font-family: monospace; font-weight: 700; letter-spacing: 2px; background: var(--agm-surface-muted); color: var(--agm-text); border: 1px dashed var(--agm-border-strong); border-radius: var(--agm-radius-sm); outline: none; }
+    small { font-size: 0.8rem; color: var(--agm-text-soft); margin-top: 4px; line-height: 1.4;}
+  }
+}
+
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ==========================================================================
+   5. PANEL DERECHO (ROSTER Y TABLA)
+   ========================================================================== */
+.data-panel {
+  background: var(--agm-panel-bg);
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--agm-shadow-soft);
+  min-width: 0;
+
+  .panel-header {
+    padding: 20px 24px 0; border-bottom: 1px solid var(--agm-border); background: var(--agm-surface-muted);
+    .header-titles { margin-bottom: 16px; h2 { margin: 0 0 4px 0; font-size: 1.4rem; } p { margin: 0; font-size: 0.95rem; color: var(--agm-text-soft); } }
+  }
+
+  .panel-tabs {
+    display: flex; gap: 24px; overflow-x: auto;
+    button { white-space: nowrap; background: none; border: none; border-bottom: 3px solid transparent; padding: 12px 4px; font-size: 1rem; font-weight: 700; color: var(--agm-text-soft); cursor: pointer; transition: color 0.2s; }
+    button:hover { color: var(--agm-primary); }
+    button.active { color: var(--agm-primary); border-bottom-color: var(--agm-primary); }
+  }
+
+  .panel-content { padding: 20px 24px; min-width: 0; }
+}
+
+.roster-meta {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+  strong { font-size: 1.05rem; }
+  .count-pill { background: color-mix(in srgb, var(--agm-primary) 10%, transparent); color: var(--agm-primary); border: 1px solid color-mix(in srgb, var(--agm-primary) 30%, transparent); padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; }
+}
+
+/* Regla 4: Roster Limpio con Feedback visual */
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+
+  .roster-card {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px; border: 1px solid var(--agm-border-strong); border-radius: var(--agm-radius-sm);
+    background: var(--agm-surface);
+    transition: all 0.2s ease;
+
+    &.present {
+      background: color-mix(in srgb, var(--agm-success) 4%, transparent);
+      border-color: color-mix(in srgb, var(--agm-success) 30%, var(--agm-border));
+    }
+
+    .student-info {
+      display: flex; flex-direction: column; gap: 4px; min-width: 0;
+      strong { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      span { font-size: 0.85rem; color: var(--agm-text-soft); font-family: monospace; }
+    }
+  }
+}
+
+.history-wrapper {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   6. RESPONSIVIDAD (MOBILE FIRST)
+   ========================================================================== */
+@media (max-width: 950px) {
+  .attendance-layout { grid-template-columns: 1fr; }
+  .ops-panel { position: relative; top: 0; order: -1; }
+  .roster-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .header-actions { flex-direction: column; align-items: flex-end !important; }
+  .last-sync-text { display: none; }
+  .attendance-wrapper { padding: 12px; }
+  .subject-selector-panel { padding: 12px 16px; }
+  .ops-card { padding: 20px; }
+  .data-panel .panel-header { padding: 16px 20px 0; }
+  .data-panel .panel-content { padding: 16px; }
+  .input-group { flex-direction: column; }
+}

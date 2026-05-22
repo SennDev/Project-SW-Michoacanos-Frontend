@@ -1,0 +1,176 @@
+<agm-page-header
+  eyebrow="Control de Asistencias"
+  title="Pase de Lista Académico"
+  description="Gestión de asistencia mediante lectura de códigos QR e ingreso de tokens.">
+
+  <div class="header-actions" style="display: flex; align-items: center; gap: 16px;">
+    @if (lastSyncedAt()) {
+      <span class="last-sync-text">
+        Última actualización: {{ lastSyncedAt() | date:'shortTime' }}
+      </span>
+    }
+    <button class="btn ghost outline" type="button" (click)="reload()">Actualizar Datos</button>
+  </div>
+
+</agm-page-header>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="attendance-wrapper">
+
+    <div class="subject-selector-panel">
+      <label for="subjectSelect">Materia en curso:</label>
+      <select id="subjectSelect" class="agm-select" [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
+        <option [ngValue]="null" disabled>Selecciona una materia...</option>
+        @for (sub of subjects(); track sub.id) {
+          <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option>
+        }
+      </select>
+    </div>
+
+    @if (selectedSubjectId()) {
+      <div class="attendance-layout">
+
+        <aside class="ops-panel">
+
+          @if (isTeacher()) {
+            <article class="ops-card">
+              <h2 class="panel-title">Operativa Docente</h2>
+
+              @if (!activeSession()) {
+                <div class="idle-message">
+                  <p>Inicia el pase de lista para obtener el ID de la sesión y compartirlo con tus alumnos.</p>
+                  <button class="btn primary block" type="button" [disabled]="starting()" (click)="startSession()">
+                    {{ starting() ? 'Iniciando...' : 'Abrir Pase de Lista' }}
+                  </button>
+                </div>
+              } @else {
+                <div class="active-session-info">
+                  <div class="info-group">
+                    <span class="status-badge success">Sesión #{{ activeSession()?.session_id || activeSession()?.id }}</span>
+                    <small class="session-date">{{ activeSessionDateLabel() }}</small>
+                  </div>
+                  <strong class="timer-countdown">{{ timeLeftLabel() }}</strong>
+                </div>
+
+                <div class="scanner-section">
+                  <div class="scanner-controls">
+                    <button class="btn block outline" (click)="scannerActive() ? stopScanner() : startScanner()">
+                      {{ scannerActive() ? 'Detener Lector QR' : scannerStarting() ? 'Abriendo cámara...' : 'Activar Lector QR' }}
+                    </button>
+                  </div>
+
+                  @if (scannerVisible()) {
+                    <div class="scanner-frame">
+                      <video #scannerVideo autoplay playsinline></video>
+                      <div class="scan-target"></div>
+                    </div>
+                  }
+                  @if (scannerMessage()) {
+                    <p class="status-text" [class.danger-text]="scannerError()">{{ scannerMessage() }}</p>
+                  }
+                </div>
+
+                <div class="manual-section">
+                  <label>Token detectado / Manual:</label>
+                  <div class="input-group">
+                    <input type="text" [(ngModel)]="qrToken" placeholder="Ejem: TKN-A1B2C3" (keyup.enter)="registerAttendance()">
+                    <button class="btn primary" [disabled]="registering() || !qrToken.trim()" (click)="registerAttendance()">
+                      {{ registering() ? '...' : 'Confirmar' }}
+                    </button>
+                  </div>
+                </div>
+
+                <button class="btn danger block outline" style="margin-top: 20px;" (click)="closeSession()">Cerrar Pase de Lista</button>
+              }
+            </article>
+          }
+
+          @if (isStudent()) {
+            <article class="ops-card qr-card">
+              <h2 class="panel-title">Generar Mi Asistencia</h2>
+
+              <div class="session-input-wrapper">
+                <label>ID de Sesión (Dictado por el docente):</label>
+                <div class="input-group">
+                  <input type="number" [(ngModel)]="studentSessionId" placeholder="Ej. 1024">
+                  <button class="btn primary" [disabled]="generatingQr() || !studentSessionId" (click)="generateQr()">
+                    {{ generatingQr() ? '...' : 'Generar' }}
+                  </button>
+                </div>
+              </div>
+
+              @if (qrPayload()) {
+                <div class="qr-display-box" style="margin-top: 24px;">
+                  <img class="qr-image" [src]="'data:image/png;base64,' + qrPayload()?.qr_png_base64" alt="QR de asistencia">
+                  <span class="timer-badge">Auto-actualiza en {{ qrTimeLeft() }}s</span>
+                </div>
+
+                <div class="token-display">
+                  <label>Tu Token alfanumérico:</label>
+                  <input type="text" readonly [value]="qrPayload()?.token" (focus)="$event.target.select()">
+                  <small>Muestra el QR a la cámara o dicta el token al docente.</small>
+                </div>
+              }
+            </article>
+          }
+
+          <div class="kpi-grid">
+            <agm-kpi-card label="Total Sesiones" [value]="sessionCount()" tone="neutral" />
+            <agm-kpi-card label="Tasa Asistencia" [value]="attendanceRate() + '%'" [tone]="attendanceRate() >= 80 ? 'success' : 'warning'" />
+          </div>
+
+        </aside>
+
+        <main class="data-panel">
+          <div class="panel-header">
+            <div class="header-titles">
+              <h2>Lista de Clase</h2>
+              <p>Total de inscritos: {{ students().length }}</p>
+            </div>
+            <nav class="panel-tabs">
+              <button [class.active]="rightPanelTab() === 'live'" (click)="rightPanelTab.set('live')">Registro en Vivo</button>
+              <button [class.active]="rightPanelTab() === 'history'" (click)="rightPanelTab.set('history')">Historial Histórico</button>
+            </nav>
+          </div>
+
+          <div class="panel-content">
+            @if (rightPanelTab() === 'live') {
+              <div class="roster-meta">
+                <strong>Estado de la sesión actual</strong>
+                <span class="count-pill">{{ presentCount() }} / {{ students().length }} Presentes</span>
+              </div>
+
+              <div class="roster-grid">
+                @for (student of liveRoster(); track student.id) {
+                  <article class="roster-card" [class.present]="student.status === 'PRESENTE'">
+                    <div class="student-info">
+                      <strong>{{ student.nombre }}</strong>
+                      <span>{{ student.matricula }}</span>
+                    </div>
+                    <span class="status-badge" [class]="student.tone">{{ student.status }}</span>
+                  </article>
+                } @empty {
+                  <agm-empty-state title="Sin registros" message="No hay alumnos inscritos en esta materia." />
+                }
+              </div>
+            }
+
+            @if (rightPanelTab() === 'history') {
+              <div class="history-wrapper">
+                <agm-searchable-table
+                  [rows]="historyRows()"
+                  [columns]="historyColumns"
+                  searchPlaceholder="Buscar registros..." />
+              </div>
+            }
+          </div>
+        </main>
+
+      </div>
+    } @else {
+      <agm-empty-state title="Sin materias" message="No tienes materias asignadas actualmente." />
+    }
+  </div>
+}
