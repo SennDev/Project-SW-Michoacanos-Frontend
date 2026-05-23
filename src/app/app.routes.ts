@@ -7,7 +7,7 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () => import('./screens/public/landing.screen').then((m) => m.LandingScreen)
+    loadComponent: () => import('./screens/public/landing/landing.screen').then((m) => m.LandingScreen)
   },
   {
     path: 'about',

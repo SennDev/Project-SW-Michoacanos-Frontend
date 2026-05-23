@@ -1,0 +1,47 @@
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(340px, 0.78fr);
+  gap: 48px;
+  align-items: center;
+  min-height: calc(100vh - 74px);
+  padding-top: 48px;
+}
+
+.hero-actions {
+  margin-top: 28px;
+}
+
+.service-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.tech-card {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.about-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  border-top: 1px solid var(--agm-border);
+}
+
+.about-strip h2 {
+  max-width: 820px;
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.12;
+}
+
+@media (max-width: 920px) {
+  .landing-hero,
+  .about-strip {
+    grid-template-columns: 1fr;
+  }
+}
