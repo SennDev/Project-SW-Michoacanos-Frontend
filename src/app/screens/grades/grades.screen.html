@@ -1,0 +1,348 @@
+<agm-page-header
+  eyebrow="Calificaciones"
+  title="Ponderaciones y Concentrado"
+  description="Consulta tu progreso académico o gestiona y evalúa las actividades de tus alumnos.">
+
+  <div class="header-actions">
+    @if (lastSyncedAt()) {
+      <span class="sync-status">Sincronizado: {{ lastSyncedAt() | date:'shortTime' }}</span>
+    }
+    <button class="btn ghost outline" type="button" (click)="reload()">Actualizar Datos</button>
+  </div>
+</agm-page-header>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="grades-dashboard-wrapper">
+
+    <section class="context-banner">
+      <article class="dashboard-card subject-card">
+        <label for="subjectSelect" class="context-label">Asignatura de Trabajo</label>
+        <div class="select-container">
+          <select id="subjectSelect" class="agm-select-lg" [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
+            <option [ngValue]="null" disabled>-- Elige una materia de tu lista --</option>
+            @for (sub of subjects(); track sub.id) {
+              <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option>
+            }
+          </select>
+        </div>
+        @if (selectedSubject()) {
+          <div class="meta-info">Docente titular: <strong>{{ selectedSubject()?.docente_nombre || 'No asignado' }}</strong></div>
+        }
+      </article>
+
+      @if (selectedSubjectId() && canEdit()) {
+        <div class="kpi-tray">
+          <agm-kpi-card label="Alumnos" [value]="students().length" tone="primary" />
+          <agm-kpi-card label="Configuración" [value]="weightTotal() + '%'" [tone]="weightTotal() === 100 ? 'success' : 'warning'" />
+          <agm-kpi-card label="Promedio General" [value]="groupAverage()" [tone]="getPassFailTone(groupAverage())" />
+        </div>
+      }
+    </section>
+
+    @if (selectedSubjectId()) {
+
+      @if (isStudent() && myStudentData(); as myData) {
+
+        <div class="student-dashboard-layout">
+          <div class="student-header-title">
+            <div class="title-with-icon">
+              <span class="user-icon"></span>
+              <h2>Consulta de Alumnos</h2>
+            </div>
+            <p>Vista individual de solo lectura. Se muestran únicamente tus datos registrados en la base de datos.</p>
+          </div>
+
+          <div class="student-info-cards">
+            <div class="info-card">
+              <label>MATRÍCULA</label>
+              <strong>{{ myData.matricula }}</strong>
+            </div>
+            <div class="info-card">
+              <label>NOMBRE</label>
+              <strong>{{ myData.nombre }}</strong>
+            </div>
+            <div class="info-card">
+              <label>CALIFICACIÓN FINAL</label>
+              <strong class="grade" [class.simulated]="simulationMode()">
+                {{ simulationMode() ? studentSimulatedAverage() : myData.calificacion }}
+              </strong>
+              <span>{{ simulationMode() ? 'Promedio simulado.' : 'Valor actual registrado en el sistema.' }}</span>
+            </div>
+            <div class="info-card">
+              <label>SECCIÓN</label>
+              <strong>{{ selectedSubject()?.seccion || 'N/A' }}</strong>
+            </div>
+          </div>
+
+          <div class="simulation-banner">
+            <p>Modo simulación te permite modificar tus calificaciones temporalmente para estimar tu resultado final.</p>
+            <div class="sim-actions">
+              <button class="btn simulation-btn" (click)="toggleSimulation()">
+                {{ simulationMode() ? 'Desactivar simulación' : 'Modo simulación' }}
+              </button>
+              @if (simulationMode()) {
+                <button class="btn ghost outline-light" (click)="simulatedScores.set({})">Restablecer simulación</button>
+              }
+            </div>
+          </div>
+
+          <div class="student-grades-tray scrollable-x">
+            <table class="matrix-table horizontal-grades-table">
+              <thead>
+                <tr>
+                  @for (act of activities(); track act.id) {
+                    <th>{{ act.nombre | uppercase }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  @for (act of activities(); track act.id) {
+                    <td>
+                      @if (simulationMode()) {
+                        <input type="number" class="sim-input"
+                               [ngModel]="simulatedScores()[act.id] ?? getScoreForMatrix(act.id, myData.id)"
+                               (ngModelChange)="updateSimulatedScore(act.id, $event)">
+                      } @else {
+                        <strong>{{ getScoreForMatrix(act.id, myData.id) }}</strong>
+                      }
+                    </td>
+                  }
+                </tr>
+              </tbody>
+            </table>
+            @if (activities().length === 0) {
+              <div class="empty-state-dark">No hay evaluaciones publicadas para este periodo.</div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (canEdit()) {
+
+        <nav class="teacher-tabs">
+          <button [class.active]="teacherTab() === 'config'" (click)="teacherTab.set('config')">1. Configuración de Curso</button>
+          <button [class.active]="teacherTab() === 'capture'" (click)="teacherTab.set('capture')">2. Captura de Evaluaciones</button>
+          <button [class.active]="teacherTab() === 'matrix'" (click)="teacherTab.set('matrix')">3. Concentrado Final de la Materia</button>
+        </nav>
+
+        @if (teacherTab() === 'config') {
+          <div class="dashboard-grid configuration-grid">
+            <article class="dashboard-card pad">
+              <div class="card-header">
+                <h3>Categorías (Ponderaciones)</h3>
+                <button class="btn ghost small outline" type="button" (click)="addWeight()">+ Añadir</button>
+              </div>
+              <p class="muted-text">Define los rubros de evaluación para que sumen el 100%.</p>
+
+              @if (weightDraft().length) {
+                <div class="weights-container scrollable-y">
+                  @for (weight of weightDraft(); track $index; let index = $index) {
+                    <div class="weight-row">
+                      <div class="field title-field">
+                        <label>Nombre del Rubro</label>
+                        <input [ngModel]="weight.nombre" (change)="updateWeightName(index, $any($event.target).value)" placeholder="Ej. Exámenes">
+                      </div>
+                      <div class="field percent-field">
+                        <label>Valor (%)</label>
+                        <input type="number" min="1" max="100" [ngModel]="weight.porcentaje" (change)="updateWeightPercentage(index, $any($event.target).value)">
+                      </div>
+                      <button type="button" class="btn danger small icon-btn" title="Eliminar Categoría" (click)="removeWeight(index)">✖</button>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <agm-empty-state title="Estructura vacía" message="Agrega categorías para definir cómo se evaluará la materia." />
+              }
+
+              <div class="card-footer">
+                <strong class="total-badge" [class.error]="weightTotal() !== 100">
+                  Total Distribuido: {{ weightTotal() }}%
+                </strong>
+                <button class="btn primary" type="button" [disabled]="weightTotal() !== 100 || savingWeights() || !hasWeightChanges()" (click)="saveWeights()">
+                  {{ savingWeights() ? 'Guardando...' : 'Guardar y Validar' }}
+                </button>
+              </div>
+            </article>
+
+            <article class="dashboard-card pad">
+              <div class="card-header">
+                <h3>Crear Actividad Evaluativa</h3>
+              </div>
+              <p class="muted-text">Abre un espacio de evaluación (Examen, Tarea, Proyecto) dentro de una categoría.</p>
+
+              <div class="form-stack">
+                <div class="field">
+                  <label>Categoría Evaluativa</label>
+                  <select class="agm-select" [(ngModel)]="activityCategoryId">
+                    <option [ngValue]="null" disabled>Selecciona una categoría guardada...</option>
+                    @for (weight of weights(); track weight.id) {
+                      <option [ngValue]="weight.id">{{ weight.nombre }} ({{ weight.porcentaje }}%)</option>
+                    }
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Título de la Evaluación</label>
+                  <input [(ngModel)]="activityName" placeholder="Ej. Mapa Mental Unidad 1">
+                </div>
+                <div class="field">
+                  <label>Puntaje Máximo Posible</label>
+                  <input type="number" min="1" [(ngModel)]="activityMaxPoints">
+                </div>
+
+                <button class="btn primary block" type="button" style="margin-top: auto;" [disabled]="creatingActivity() || !activityCategoryId || !activityName.trim()" (click)="createActivity()">
+                  Aperturar Actividad
+                </button>
+              </div>
+            </article>
+          </div>
+        }
+
+        @if (teacherTab() === 'capture') {
+          <div class="dashboard-grid capture-layout">
+            <aside class="sidebar-tools">
+              <article class="dashboard-card pad">
+                <h3>Actividades Disponibles</h3>
+                @if (activities().length) {
+                  <div class="vertical-activity-list scrollable-y">
+                    @for (activity of activities(); track activity.id) {
+                      <button type="button" class="activity-btn" [class.active]="selectedActivityId === activity.id" (click)="selectActivity(activity.id)">
+                        <div class="act-details">
+                          <strong>{{ activity.nombre }}</strong>
+                          <span>{{ categoryName(activity.categoria_id) }} | Max. {{ activity.max_puntos }} pts</span>
+                        </div>
+                        <span class="arrow">→</span>
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <agm-empty-state title="Vacío" message="Primero crea una actividad." />
+                }
+              </article>
+
+              <article class="dashboard-card pad import-tray">
+                <h3>Carga Rápida CSV</h3>
+                <p class="muted-text" style="margin-bottom: 8px;">Destino: <strong>{{ selectedActivity()?.nombre || 'Selecciona arriba' }}</strong></p>
+                <agm-file-upload-card compact="true" title="Subir Calificaciones" hint="formato: matricula, puntaje" accept=".csv,.xlsx" actionLabel="Cargar" [loading]="importingGrades()" (upload)="importGrades($event)" />
+              </article>
+            </aside>
+
+            <main class="dashboard-card capture-panel">
+              <div class="capture-header pad">
+                <div class="info-block">
+                  <h2>Asignación: <span>{{ selectedActivity()?.nombre || 'Selecciona una actividad...' }}</span></h2>
+                  <div class="status-indicator">
+                    <span class="dot live"></span> {{ saveStatusLabel() }}
+                    @if (pendingDraftCount()) { <span class="badge warning">{{ pendingDraftCount() }} sin guardar</span> }
+                  </div>
+                </div>
+                <div class="score-summary">
+                  <span>Promedio de la Actividad</span>
+                  <strong>{{ captureAverage() }}</strong>
+                </div>
+              </div>
+
+              @if (selectedActivity() && students().length) {
+                <div class="capture-grid scrollable-y">
+                  @for (student of students(); track student.id) {
+                    <div class="student-row">
+                      <div class="identity">
+                        <strong>{{ student.nombre }}</strong>
+                        <span>{{ student.matricula }}</span>
+                      </div>
+
+                      <div class="grade-context" title="Promedio General Actual">
+                        <span class="average-pill" [class]="getPassFailTone(studentAverage(student.id))">
+                          {{ studentAverage(student.id) }}
+                        </span>
+                      </div>
+
+                      <div class="input-cell">
+                        <input
+                          type="number" min="0" [max]="selectedActivity()?.max_puntos || 100"
+                          [ngModel]="displayScore(student.id)"
+                          (change)="updateGradeDraft(student.id, $any($event.target).value)"
+                          placeholder="--"
+                          [class.is-dirty]="draftScores()[student.id] !== undefined">
+                      </div>
+
+                      <div class="action-cell">
+                        <button class="btn outline small" type="button" [disabled]="savingStudent(student.id) || draftScores()[student.id] === undefined" (click)="saveStudentGrade(student)">
+                          {{ savingStudent(student.id) ? '...' : 'Fijar' }}
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <div class="capture-footer pad">
+                  <span class="help-text">Guarda de manera masiva todos los valores que ingresaste en la tabla.</span>
+                  <button class="btn primary" type="button" [disabled]="savingBatch() || !hasDrafts()" (click)="saveDraftGrades()">
+                    {{ savingBatch() ? 'Subiendo...' : 'Guardar Todo el Grupo' }}
+                  </button>
+                </div>
+              } @else {
+                <div class="pad empty-capture">
+                  <agm-empty-state title="Lista Inactiva" message="Haz clic en una actividad disponible a la izquierda." />
+                </div>
+              }
+            </main>
+          </div>
+        }
+
+        @if (teacherTab() === 'matrix') {
+          <section class="dashboard-card pad final-matrix-section">
+            <div class="card-header" style="margin-bottom: 20px;">
+              <h3>Concentrado Final de la Materia</h3>
+              <p class="muted-text">Vista panorámica de todas las calificaciones por alumno.</p>
+            </div>
+
+            <div class="matrix-container scrollable-x">
+              <table class="matrix-table teacher-matrix">
+                <thead>
+                  <tr>
+                    <th class="sticky-col mat-col">Matrícula</th>
+                    <th class="sticky-col name-col">Nombre del Alumno</th>
+                    @for (act of activities(); track act.id) {
+                      <th>{{ act.nombre }}<br><small>{{ act.max_puntos }}pts</small></th>
+                    }
+                    <th class="highlight-th">Prom.</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of visibleSummary(); track row.alumno_id) {
+                    <tr>
+                      <td class="sticky-col mat-col">{{ row.matricula }}</td>
+                      <td class="sticky-col name-col"><strong>{{ row.nombre }}</strong></td>
+
+                      @for (act of activities(); track act.id) {
+                        <td class="score-cell">{{ getScoreForMatrix(act.id, row.alumno_id) }}</td>
+                      }
+
+                      <td class="highlight-col"><strong>{{ row.promedio_real.toFixed(1) }}</strong></td>
+                      <td>
+                        <span class="status-badge" [class]="getPassFailTone(row.promedio_redondeado)">
+                          {{ isPassing(row.promedio_redondeado) ? 'Aprobado' : 'Reprobado' }}
+                        </span>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td [attr.colspan]="activities().length + 4" class="empty-cell">No hay datos suficientes para generar el concentrado.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
+      }
+    } @else {
+      <div class="start-empty-state">
+        <agm-empty-state title="Tablero Académico" message="Abre el selector de la parte superior para ingresar a tu entorno de trabajo." />
+      </div>
+    }
+  </div>
+}

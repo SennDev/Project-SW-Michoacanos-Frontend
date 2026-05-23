@@ -1,22 +1,25 @@
 import { Component, DestroyRef, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, finalize, forkJoin, interval, of, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
 import { AuthService } from '../../core/auth/auth.service';
 import { SubjectScopeService } from '../../core/services/subject-scope.service';
 import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { AcademicsService } from '../../services/academics.service';
 import { GradesService } from '../../services/grades.service';
+
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { FileUploadCardComponent } from '../../shared/components/file-upload-card/file-upload-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
+
 import { Student, Subject } from '../../shared/models/academic.models';
 import { GradeSummary, LocalActivity, WeightCategory } from '../../shared/models/grade.models';
-import { TableColumn } from '../../shared/models/ui.models';
 
 interface WeightDraft {
   nombre: string;
@@ -26,458 +29,46 @@ interface WeightDraft {
 @Component({
   selector: 'agm-grades-screen',
   standalone: true,
-  imports: [FormsModule, PageHeaderComponent, KpiCardComponent, SearchableTableComponent, FileUploadCardComponent, EmptyStateComponent, LoadingSkeletonComponent],
-  template: `
-    <agm-page-header
-      eyebrow="Calificaciones"
-      title="Ponderaciones, actividades y concentrado"
-      description="Configura categorias por materia, registra actividades y consulta promedios calculados por ms-grades."
-    >
-      <button class="btn ghost" type="button" (click)="reload()">Actualizar</button>
-    </agm-page-header>
-
-    @if (loading()) {
-      <agm-loading-skeleton [rows]="6" />
-    } @else {
-      <section class="grid-4">
-        <agm-kpi-card label="Materias" [value]="subjects().length" tone="primary" />
-        <agm-kpi-card label="Ponderacion total" [value]="weightTotal() + '%'" [tone]="weightTotal() === 100 ? 'success' : 'warning'" />
-        <agm-kpi-card label="Actividades creadas" [value]="activities().length" tone="warning" />
-        <agm-kpi-card label="Promedio grupal" [value]="groupAverage()" [tone]="groupAverage() >= 70 ? 'success' : 'danger'" />
-      </section>
-
-      <section class="grid-3" style="margin-top: 18px;">
-        <article class="panel pad">
-          <h2 class="panel-title">Materia</h2>
-          <div class="field">
-            <label>Selecciona una materia</label>
-            <select [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
-              <option [ngValue]="null">Sin seleccion</option>
-              @for (subject of subjects(); track subject.id) {
-                <option [ngValue]="subject.id">{{ subject.nrc }} - {{ subject.nombre }}</option>
-              }
-            </select>
-          </div>
-          @if (selectedSubject()) {
-            <div class="divider"></div>
-            <strong>{{ selectedSubject()?.nombre }}</strong>
-            <p class="muted">{{ selectedSubject()?.docente_nombre || 'Docente pendiente' }}</p>
-          }
-        </article>
-
-        <article class="panel pad" style="grid-column: span 2;">
-          <div class="row between">
-            <h2 class="panel-title">Ponderaciones</h2>
-            @if (canEdit()) {
-              <button class="btn ghost small" type="button" (click)="addWeight()">Agregar</button>
-            }
-          </div>
-
-          @if (weightDraft().length) {
-            <div class="stack">
-              @for (weight of weightDraft(); track $index; let index = $index) {
-                <div class="form-grid cols-2">
-                  <div class="field">
-                    <label>Categoria</label>
-                    <input [disabled]="!canEdit()" [ngModel]="weight.nombre" (ngModelChange)="updateWeight(index, 'nombre', $event)">
-                  </div>
-                  <div class="field">
-                    <label>Porcentaje</label>
-                    <input type="number" min="1" max="100" [disabled]="!canEdit()" [ngModel]="weight.porcentaje" (ngModelChange)="updateWeight(index, 'porcentaje', $event)">
-                  </div>
-                </div>
-              }
-            </div>
-          } @else {
-            <agm-empty-state title="Sin ponderaciones" message="Define categorias que sumen exactamente 100 para habilitar actividades." />
-          }
-
-          @if (canEdit()) {
-            <div class="row between wrap" style="margin-top: 14px;">
-              <span class="muted">Total: {{ weightTotal() }}%</span>
-              <button class="btn primary" type="button" [disabled]="weightTotal() !== 100 || savingWeights()" (click)="saveWeights()">
-                {{ savingWeights() ? 'Guardando...' : 'Guardar ponderaciones' }}
-              </button>
-            </div>
-          }
-        </article>
-      </section>
-
-      @if (canEdit()) {
-        <section class="grade-workflow" style="margin-top: 18px;">
-          <article>
-            <span>1</span>
-            <strong>Configura categorias</strong>
-            <small>La suma debe cerrar en 100%.</small>
-          </article>
-          <article>
-            <span>2</span>
-            <strong>Crea actividades</strong>
-            <small>Define cada entrega o evaluacion.</small>
-          </article>
-          <article>
-            <span>3</span>
-            <strong>Captura o importa</strong>
-            <small>Guarda puntajes por actividad.</small>
-          </article>
-        </section>
-
-        <section class="grid-3" style="margin-top: 18px;">
-          <article class="panel pad">
-            <h2 class="panel-title">Nueva actividad</h2>
-            <div class="form-grid">
-              <div class="field">
-                <label>Categoria guardada</label>
-                <select [(ngModel)]="activityCategoryId">
-                  <option [ngValue]="null">Selecciona categoria</option>
-                  @for (weight of weights(); track weight.id) {
-                    <option [ngValue]="weight.id">{{ weight.nombre }} ({{ weight.porcentaje }}%)</option>
-                  }
-                </select>
-              </div>
-              <div class="field">
-                <label>Nombre</label>
-                <input [(ngModel)]="activityName" placeholder="Proyecto final">
-              </div>
-              <div class="field">
-                <label>Maximo de puntos</label>
-                <input type="number" min="1" [(ngModel)]="activityMaxPoints">
-              </div>
-              <button class="btn primary" type="button" [disabled]="creatingActivity()" (click)="createActivity()">Crear actividad</button>
-            </div>
-          </article>
-
-          <article class="panel pad">
-            <h2 class="panel-title">Importar calificaciones</h2>
-            <div class="field" style="margin-bottom: 12px;">
-              <label>Actividad</label>
-              <select [ngModel]="selectedActivityId" (ngModelChange)="selectActivity($event)">
-                <option [ngValue]="null">Selecciona actividad</option>
-                @for (activity of activities(); track activity.id) {
-                  <option [ngValue]="activity.id">{{ activity.nombre }}</option>
-                }
-              </select>
-            </div>
-            <agm-file-upload-card
-              title="CSV/XLSX de calificaciones"
-              hint="Columnas esperadas: matricula y calificacion."
-              accept=".csv,.xlsx,.xlsm"
-              actionLabel="Importar"
-              [loading]="importingGrades()"
-              (upload)="importGrades($event)"
-            />
-          </article>
-
-          <article class="panel pad">
-            <h2 class="panel-title">Actividades disponibles</h2>
-            <div class="persistence-note">
-              <strong>Nota de persistencia</strong>
-              <span>El backend actual permite crear actividades, pero no expone una lectura REST para rehidratarlas despues de reiniciar. AGM conserva esta lista como referencia local del navegador hasta que exista ese endpoint.</span>
-            </div>
-            @if (activities().length) {
-              <div class="activity-list">
-                @for (activity of activities(); track activity.id) {
-                  <button
-                    type="button"
-                    [class.active]="selectedActivityId === activity.id"
-                    (click)="selectActivity(activity.id)"
-                  >
-                    <strong>{{ activity.nombre }}</strong>
-                    <span>{{ categoryName(activity.categoria_id) }} | {{ activity.max_puntos }} pts</span>
-                  </button>
-                }
-              </div>
-            } @else {
-              <agm-empty-state title="Sin actividades" message="Crea la primera actividad despues de guardar ponderaciones." />
-            }
-          </article>
-        </section>
-
-        <section class="panel pad capture-panel" style="margin-top: 18px;">
-          <div class="row between wrap">
-            <div>
-              <h2 class="panel-title">Captura por actividad</h2>
-              <p class="muted">
-                {{ selectedActivity()?.nombre || 'Selecciona una actividad para capturar puntajes.' }}
-              </p>
-            </div>
-            <div class="capture-stats">
-              <span>{{ students().length }} alumnos</span>
-              <strong>{{ captureAverage() }}</strong>
-            </div>
-          </div>
-
-          <div class="capture-status">
-            <span class="sync-line">
-              <span class="sync-dot" aria-hidden="true"></span>
-              {{ saveStatusLabel() }}
-            </span>
-            @if (pendingDraftCount()) {
-              <span class="status-badge warning">{{ pendingDraftCount() }} pendientes</span>
-            }
-          </div>
-
-          @if (selectedActivity() && students().length) {
-            <div class="capture-grid">
-              @for (student of students(); track student.id) {
-                <article>
-                  <div>
-                    <strong>{{ student.nombre }}</strong>
-                    <span>{{ student.matricula }}</span>
-                  </div>
-                  <span class="average-pill" [class]="averageTone(student.id)">
-                    {{ studentAverage(student.id) }}
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    [max]="selectedActivity()?.max_puntos || 100"
-                    [ngModel]="gradeDraft(student.id)"
-                    (ngModelChange)="updateGradeDraft(student.id, $event)"
-                    placeholder="0"
-                  >
-                  <button class="btn ghost small" type="button" [disabled]="savingStudent(student.id)" (click)="saveStudentGrade(student)">
-                    {{ savingStudent(student.id) ? 'Guardando...' : 'Guardar' }}
-                  </button>
-                </article>
-              }
-            </div>
-            <div class="row between wrap capture-footer">
-              <span class="muted">Los puntajes guardados actualizan el concentrado de la materia.</span>
-              <button class="btn primary" type="button" [disabled]="savingBatch() || !hasDrafts()" (click)="saveDraftGrades()">
-                {{ savingBatch() ? 'Guardando...' : 'Guardar captura' }}
-              </button>
-            </div>
-          } @else {
-            <agm-empty-state
-              title="Captura pendiente"
-              message="Selecciona una actividad con alumnos inscritos para registrar o actualizar calificaciones."
-            />
-          }
-        </section>
-      }
-
-      <section style="margin-top: 18px;">
-        <agm-searchable-table
-          [rows]="visibleSummary()"
-          [columns]="summaryColumns"
-          placeholder="Buscar alumno o matricula"
-          emptyTitle="Sin concentrado"
-          emptyMessage="El concentrado se llena cuando existen alumnos y calificaciones para la materia."
-        />
-      </section>
-    }
-  `,
-  styles: [`
-    .grade-workflow {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .grade-workflow article {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 2px 12px;
-      align-items: center;
-      padding: 15px;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius);
-      background: color-mix(in srgb, var(--agm-surface) 88%, var(--agm-primary-soft));
-    }
-
-    .grade-workflow span {
-      grid-row: span 2;
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      color: white;
-      background: linear-gradient(135deg, var(--agm-primary), var(--agm-secondary));
-      font-weight: 900;
-    }
-
-    .grade-workflow small,
-    .activity-list span,
-    .capture-grid span {
-      color: var(--agm-text-soft);
-    }
-
-    .activity-list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .persistence-note {
-      display: grid;
-      gap: 5px;
-      margin-bottom: 12px;
-      padding: 12px;
-      border: 1px solid color-mix(in srgb, var(--agm-warning) 28%, var(--agm-border));
-      border-radius: var(--agm-radius-sm);
-      background: var(--agm-warning-soft);
-    }
-
-    .persistence-note strong {
-      color: var(--agm-warning);
-      font-size: var(--agm-font-size-sm);
-    }
-
-    .persistence-note span {
-      color: var(--agm-text-soft);
-      font-size: var(--agm-font-size-sm);
-      line-height: 1.45;
-    }
-
-    .activity-list button {
-      display: grid;
-      gap: 3px;
-      width: 100%;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius-sm);
-      padding: 12px;
-      color: inherit;
-      background: var(--agm-surface-muted);
-      text-align: left;
-    }
-
-    .activity-list button.active {
-      border-color: var(--agm-secondary);
-      background: var(--agm-primary-soft);
-    }
-
-    .capture-panel p {
-      margin: 3px 0 0;
-    }
-
-    .capture-stats {
-      display: grid;
-      gap: 3px;
-      min-width: 120px;
-      text-align: right;
-    }
-
-    .capture-stats span {
-      color: var(--agm-text-soft);
-      font-size: 0.82rem;
-    }
-
-    .capture-stats strong {
-      font-size: 1.25rem;
-    }
-
-    .capture-grid {
-      display: grid;
-      gap: 10px;
-      margin-top: 16px;
-    }
-
-    .capture-status {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .capture-grid article {
-      display: grid;
-      grid-template-columns: minmax(180px, 1fr) auto 110px auto;
-      gap: 12px;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius-sm);
-      background: var(--agm-surface-muted);
-    }
-
-    .capture-grid article div {
-      display: grid;
-      gap: 3px;
-    }
-
-    .capture-grid input {
-      width: 100%;
-      border: 1px solid var(--agm-border);
-      border-radius: var(--agm-radius-sm);
-      padding: 10px 12px;
-      background: var(--agm-surface);
-      color: var(--agm-text);
-    }
-
-    .average-pill {
-      display: inline-flex;
-      min-width: 58px;
-      min-height: 30px;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      padding: 0 10px;
-      font-weight: 850;
-      background: var(--agm-surface);
-      border: 1px solid var(--agm-border);
-    }
-
-    .average-pill.success {
-      color: var(--agm-success);
-      border-color: color-mix(in srgb, var(--agm-success) 28%, var(--agm-border));
-    }
-
-    .average-pill.warning {
-      color: var(--agm-warning);
-      border-color: color-mix(in srgb, var(--agm-warning) 28%, var(--agm-border));
-    }
-
-    .average-pill.danger {
-      color: var(--agm-danger);
-      border-color: color-mix(in srgb, var(--agm-danger) 28%, var(--agm-border));
-    }
-
-    .capture-footer {
-      margin-top: 14px;
-    }
-
-    @media (max-width: 920px) {
-      .grade-workflow {
-        grid-template-columns: 1fr;
-      }
-
-      .capture-grid article {
-        grid-template-columns: 1fr;
-      }
-
-      .capture-stats {
-        text-align: left;
-      }
-
-      .capture-status {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-    }
-  `]
+  imports: [
+    CommonModule, FormsModule, DatePipe, PageHeaderComponent, KpiCardComponent,
+    SearchableTableComponent, FileUploadCardComponent, EmptyStateComponent,
+    LoadingSkeletonComponent
+  ],
+  templateUrl: './grades.screen.html',
+  styleUrl: './grades.screen.scss'
 })
 export class GradesScreen implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
-  private readonly auth = inject(AuthService);
+  public readonly auth = inject(AuthService);
   private readonly subjectScope = inject(SubjectScopeService);
   private readonly academics = inject(AcademicsService);
   private readonly grades = inject(GradesService);
   private readonly toasts = inject(ToastService);
 
+  // --- ESTADOS GLOBALES ---
   readonly loading = signal(true);
   readonly savingWeights = signal(false);
   readonly creatingActivity = signal(false);
   readonly importingGrades = signal(false);
+
   readonly subjects = signal<Subject[]>([]);
   readonly selectedSubjectId = signal<number | null>(null);
+
   readonly weights = signal<WeightCategory[]>([]);
   readonly weightDraft = signal<WeightDraft[]>([]);
   readonly activities = signal<LocalActivity[]>([]);
   readonly summary = signal<GradeSummary[]>([]);
   readonly students = signal<Student[]>([]);
+
+  // --- ESTADOS DE UI ---
+  // Nueva navegación superior para el Docente
+  readonly teacherTab = signal<'config' | 'capture' | 'matrix'>('config');
+
+  // --- SISTEMA DE CAPTURA DOCENTE ---
   readonly draftScores = signal<Record<number, number | null>>({});
+  // Caché Maestro: Guarda las calificaciones extraídas del backend { actividadId: { alumnoId: calificacion } }
+  readonly confirmedScores = signal<Record<number, Record<number, number>>>({});
+
   readonly savingStudentIds = signal<number[]>([]);
   readonly savingBatch = signal(false);
   readonly lastSavedAt = signal<Date | null>(null);
@@ -490,21 +81,36 @@ export class GradesScreen implements OnInit, OnDestroy {
   selectedActivityId: number | null = null;
   private pollSubscription?: Subscription;
 
-  readonly summaryColumns: TableColumn<GradeSummary>[] = [
-    { key: 'matricula', header: 'Matricula' },
-    { key: 'nombre', header: 'Alumno' },
-    { key: 'promedio_real', header: 'Promedio real', formatter: (row) => row.promedio_real.toFixed(2) },
-    { key: 'promedio_redondeado', header: 'Redondeado' },
-    { key: 'promedio_redondeado', header: 'Estado', badge: (row) => row.promedio_redondeado >= 70 ? 'Aprobado' : 'Reprobado' }
-  ];
+  // --- SISTEMA MODO SIMULACIÓN (ALUMNOS) ---
+  readonly simulationMode = signal(false);
+  readonly simulatedScores = signal<Record<number, number>>({});
+
+  // --- COMPUTADOS ---
+  readonly isTeacher = computed(() => this.auth.role() === 'admin' || this.auth.role() === 'docente');
+  readonly isStudent = computed(() => this.auth.role() === 'alumno');
 
   readonly weightTotal = computed(() => Math.round(this.weightDraft().reduce((sum, item) => sum + Number(item.porcentaje || 0), 0) * 100) / 100);
+
   readonly visibleSummary = computed(() => {
     const summary = this.summary();
     const user = this.auth.user();
-    return user?.role === 'alumno' && user.profile_id
+    return this.isStudent() && user?.profile_id
       ? summary.filter((row) => row.alumno_id === user.profile_id)
       : summary;
+  });
+
+  readonly myStudentData = computed(() => {
+    if (!this.isStudent()) return null;
+    const profileId = this.auth.user()?.profile_id;
+    const student = this.students().find(s => s.id === profileId);
+    const sum = this.visibleSummary()[0];
+    return {
+      id: profileId || 0,
+      matricula: student?.matricula || this.auth.user()?.email?.split('@')[0] || 'N/D',
+      nombre: student?.nombre || 'Alumno',
+      calificacion: sum ? sum.promedio_redondeado : '--',
+      calificacionReal: sum ? sum.promedio_real : 0
+    };
   });
 
   ngOnInit(): void {
@@ -512,11 +118,23 @@ export class GradesScreen implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.pollSubscription?.unsubscribe();
+    this.stopPolling();
   }
 
   canEdit(): boolean {
-    return this.auth.role() === 'admin' || this.auth.role() === 'docente';
+    return this.isTeacher();
+  }
+
+  // --- LÓGICA DE APROBACIÓN (ESCALA 6.0 / 60) ---
+  isPassing(score: number | string): boolean {
+    const val = Number(score);
+    if (isNaN(val)) return false;
+    return val >= 6.0 || val >= 60;
+  }
+
+  getPassFailTone(score: number | string): 'success' | 'danger' | 'warning' {
+    if (score === '--' || score === null) return 'warning';
+    return this.isPassing(score) ? 'success' : 'danger';
   }
 
   selectedSubject(): Subject | undefined {
@@ -525,9 +143,7 @@ export class GradesScreen implements OnInit, OnDestroy {
 
   groupAverage(): number {
     const rows = this.visibleSummary();
-    if (!rows.length) {
-      return 0;
-    }
+    if (!rows.length) return 0;
     return Math.round((rows.reduce((sum, row) => sum + row.promedio_real, 0) / rows.length) * 10) / 10;
   }
 
@@ -535,8 +151,9 @@ export class GradesScreen implements OnInit, OnDestroy {
     this.loading.set(true);
     this.subjectScope.listVisibleSubjects().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (subjects) => {
-        this.subjects.set(subjects);
-        const initial = this.selectedSubjectId() ?? subjects[0]?.id ?? null;
+        const sortedSubs = subjects.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        this.subjects.set(sortedSubs);
+        const initial = this.selectedSubjectId() ?? sortedSubs[0]?.id ?? null;
         this.selectedSubjectId.set(initial);
         if (initial) {
           this.loadSubjectData(initial, true);
@@ -547,7 +164,7 @@ export class GradesScreen implements OnInit, OnDestroy {
         }
       },
       error: (error: unknown) => {
-        this.toasts.error('No se cargaron materias', errorMessage(error));
+        this.toasts.error('Error', errorMessage(error));
         this.loading.set(false);
       }
     });
@@ -579,54 +196,92 @@ export class GradesScreen implements OnInit, OnDestroy {
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ weights, summary, students, activities }) => {
         this.weights.set(weights);
-        this.weightDraft.set(weights.map((weight) => ({ nombre: weight.nombre, porcentaje: weight.porcentaje })));
+        this.weightDraft.set(weights.map((w) => ({ nombre: w.nombre, porcentaje: w.porcentaje })));
         this.summary.set(summary);
-        this.students.set(students);
+        this.students.set(students.sort((a, b) => a.nombre.localeCompare(b.nombre)));
         this.activities.set(activities);
-        const stillExists = activities.some((activity) => activity.id === this.selectedActivityId);
+
+        // EXTRACCIÓN DINÁMICA DE CALIFICACIONES INDIVIDUALES DESDE EL BACKEND
+        const newConfirmed: Record<number, Record<number, number>> = {};
+        summary.forEach(sum => {
+          // Buscamos cualquier arreglo de notas (actividades, calificaciones, scores) que mande el backend
+          const scoresArray = (sum as any).calificaciones || (sum as any).actividades || (sum as any).scores || [];
+          scoresArray.forEach((c: any) => {
+            const actId = c.actividad_id || c.id || c.activity_id;
+            const pts = c.puntaje ?? c.score ?? c.calificacion ?? c.puntos;
+            if (actId !== undefined && pts !== undefined) {
+              if (!newConfirmed[actId]) newConfirmed[actId] = {};
+              newConfirmed[actId][sum.alumno_id] = Number(pts);
+            }
+          });
+        });
+
+        // Combinamos lo que haya en la caché visual actual con lo nuevo que llegó
+        this.confirmedScores.update(curr => ({ ...curr, ...newConfirmed }));
+
+        const stillExists = activities.some((a) => a.id === this.selectedActivityId);
         this.selectedActivityId = stillExists ? this.selectedActivityId : activities[0]?.id ?? null;
+
         this.lastSyncedAt.set(new Date());
         this.syncing.set(false);
-        if (finishLoading) {
-          this.loading.set(false);
-        }
+        if (finishLoading) this.loading.set(false);
       },
       error: (error: unknown) => {
-        this.toasts.warning('Datos incompletos', errorMessage(error));
-        this.weights.set([]);
-        this.weightDraft.set([]);
-        this.summary.set([]);
-        this.students.set([]);
-        this.activities.set(this.grades.getLocalActivities(subjectId));
-        this.selectedActivityId = this.activities()[0]?.id ?? null;
-        this.draftScores.set({});
+        this.toasts.warning('Aviso', 'Algunos datos del periodo están incompletos.');
         this.syncing.set(false);
-        if (finishLoading) {
-          this.loading.set(false);
-        }
+        if (finishLoading) this.loading.set(false);
       }
     });
   }
 
-  addWeight(): void {
-    this.weightDraft.update((items) => [...items, { nombre: 'Nueva categoria', porcentaje: 0 }]);
+  // --- GUARDIÁN DE POLLING (Evita el crasheo al escribir) ---
+  hasWeightChanges(): boolean {
+    const saved = this.weights();
+    const draft = this.weightDraft();
+    if (saved.length !== draft.length) return true;
+    return draft.some((d, i) => d.nombre !== saved[i].nombre || Number(d.porcentaje) !== Number(saved[i].porcentaje));
   }
 
-  updateWeight(index: number, key: keyof WeightDraft, value: string | number): void {
-    this.weightDraft.update((items) => items.map((item, itemIndex) => itemIndex === index
-      ? { ...item, [key]: key === 'porcentaje' ? Number(value) : String(value) }
-      : item
-    ));
+  // --- LÓGICA DE PONDERACIONES ---
+  addWeight(): void {
+    this.weightDraft.update((items) => [...items, { nombre: '', porcentaje: 0 }]);
+  }
+
+  removeWeight(index: number): void {
+    this.weightDraft.update((items) => items.filter((_, i) => i !== index));
+  }
+
+  updateWeightName(index: number, name: string): void {
+    this.weightDraft.update((items) => {
+      const newItems = [...items];
+      newItems[index].nombre = name;
+      return newItems;
+    });
+  }
+
+  updateWeightPercentage(index: number, pct: number | string): void {
+    this.weightDraft.update((items) => {
+      const newItems = [...items];
+      newItems[index].porcentaje = Number(pct) || 0;
+      return newItems;
+    });
   }
 
   saveWeights(): void {
     const subjectId = this.selectedSubjectId();
-    if (!subjectId || this.weightTotal() !== 100) {
-      this.toasts.warning('Ponderacion invalida', 'La suma debe ser exactamente 100.');
-      return;
-    }
+    if (!subjectId) return;
+
+    const drafts = this.weightDraft().map(w => ({
+      nombre: w.nombre.trim(),
+      porcentaje: Number(w.porcentaje) || 0
+    }));
+
+    if (drafts.some(w => !w.nombre)) return this.toasts.warning('Faltan Datos', 'Todas las categorías deben tener un nombre.');
+    if (drafts.some(w => w.porcentaje <= 0)) return this.toasts.warning('Porcentaje Inválido', 'Elimina las categorías vacías.');
+    if (this.weightTotal() !== 100) return this.toasts.warning('Suma Incorrecta', 'El total debe ser exactamente 100%.');
+
     this.savingWeights.set(true);
-    this.grades.saveWeights(subjectId, { items: this.weightDraft() }).pipe(
+    this.grades.saveWeights(subjectId, { items: drafts }).pipe(
       finalize(() => this.savingWeights.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
@@ -634,15 +289,14 @@ export class GradesScreen implements OnInit, OnDestroy {
         this.toasts.success('Ponderaciones guardadas');
         this.loadSubjectData(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('No se guardaron', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Error al guardar', errorMessage(error))
     });
   }
 
   createActivity(): void {
     const subjectId = this.selectedSubjectId();
     if (!subjectId || !this.activityCategoryId || !this.activityName.trim()) {
-      this.toasts.warning('Completa la actividad');
-      return;
+      return this.toasts.warning('Revisa los datos de la actividad');
     }
     this.creatingActivity.set(true);
     this.grades.createActivity({
@@ -655,37 +309,31 @@ export class GradesScreen implements OnInit, OnDestroy {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (response) => {
-        this.toasts.success('Actividad creada');
+        this.toasts.success('Actividad creada exitosamente');
         this.activityName = '';
         this.selectedActivityId = response.id;
         this.loadSubjectData(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('No se creo la actividad', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Error al crear actividad', errorMessage(error))
     });
   }
 
   importGrades(file: File): void {
     const activityId = this.selectedActivityId;
     const subjectId = this.selectedSubjectId();
-    if (!activityId || !subjectId) {
-      this.toasts.warning('Selecciona una actividad');
-      return;
-    }
+    if (!activityId || !subjectId) return this.toasts.warning('Selecciona una actividad primero');
+
     this.importingGrades.set(true);
     this.grades.importGrades(activityId, file).pipe(
       finalize(() => this.importingGrades.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (result) => {
-        this.toasts.success('Calificaciones importadas', `${result.actualizadas} actualizadas`);
+        this.toasts.success('Importación exitosa', `${result.actualizadas} calificaciones cargadas.`);
         this.loadSubjectData(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('Importacion fallida', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Fallo al importar', errorMessage(error))
     });
-  }
-
-  selectedActivity(): LocalActivity | undefined {
-    return this.activities().find((activity) => activity.id === this.selectedActivityId);
   }
 
   selectActivity(activityId: number | null): void {
@@ -693,45 +341,47 @@ export class GradesScreen implements OnInit, OnDestroy {
     this.draftScores.set({});
   }
 
+  selectedActivity(): LocalActivity | undefined {
+    return this.activities().find((activity) => activity.id === this.selectedActivityId);
+  }
+
   categoryName(categoryId: number): string {
-    return this.weights().find((weight) => weight.id === categoryId)?.nombre ?? 'Categoria';
+    return this.weights().find((w) => w.id === categoryId)?.nombre ?? 'Categoría';
   }
 
-  studentAverage(studentId: number): string {
-    const summary = this.summary().find((row) => row.alumno_id === studentId);
-    return summary ? summary.promedio_real.toFixed(1) : '--';
+  // --- OBTENCIÓN UNIVERSAL DE CALIFICACIONES ---
+  getScoreForMatrix(activityId: number, studentId: number): string | number {
+    const confirmed = this.confirmedScores()[activityId]?.[studentId];
+    return confirmed !== undefined ? confirmed : '--';
   }
 
-  averageTone(studentId: number): 'success' | 'warning' | 'danger' {
-    const summary = this.summary().find((row) => row.alumno_id === studentId);
-    if (!summary) {
-      return 'warning';
-    }
-    if (summary.promedio_redondeado >= 80) {
-      return 'success';
-    }
-    if (summary.promedio_redondeado >= 70) {
-      return 'warning';
-    }
-    return 'danger';
+  displayScore(studentId: number): number | string {
+    const actId = this.selectedActivityId;
+    const draft = this.draftScores()[studentId];
+    if (draft !== undefined) return draft === null ? '' : draft;
+    if (!actId) return '';
+    const confirmed = this.confirmedScores()[actId]?.[studentId];
+    return confirmed !== undefined ? confirmed : '';
   }
 
-  gradeDraft(studentId: number): number | null {
-    return this.draftScores()[studentId] ?? null;
-  }
-
-  updateGradeDraft(studentId: number, value: number | string | null): void {
-    const parsed = value === null || value === '' ? null : Number(value);
+  updateGradeDraft(studentId: number, value: string): void {
+    const parsed = value === '' ? null : Number(value);
     this.draftScores.update((drafts) => ({ ...drafts, [studentId]: Number.isNaN(parsed) ? null : parsed }));
   }
 
   captureAverage(): string {
+    const actId = this.selectedActivityId;
+    if (!actId) return '--';
+
     const scores = this.students()
-      .map((student) => this.gradeDraft(student.id))
+      .map(student => {
+        const draft = this.draftScores()[student.id];
+        if (typeof draft === 'number') return draft;
+        return this.confirmedScores()[actId]?.[student.id];
+      })
       .filter((score): score is number => typeof score === 'number');
-    if (!scores.length) {
-      return '--';
-    }
+
+    if (!scores.length) return '--';
     return (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1);
   }
 
@@ -743,23 +393,6 @@ export class GradesScreen implements OnInit, OnDestroy {
     return Object.values(this.draftScores()).filter((score) => typeof score === 'number').length;
   }
 
-  saveStatusLabel(): string {
-    if (this.savingBatch() || this.savingStudentIds().length) {
-      return 'Guardando cambios...';
-    }
-    if (this.syncing()) {
-      return 'Sincronizando datos guardados...';
-    }
-    const lastSavedAt = this.lastSavedAt();
-    if (lastSavedAt) {
-      return `Guardado ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    }
-    const lastSyncedAt = this.lastSyncedAt();
-    return lastSyncedAt
-      ? `Datos cargados ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-      : 'Cargando datos guardados';
-  }
-
   savingStudent(studentId: number): boolean {
     return this.savingStudentIds().includes(studentId);
   }
@@ -767,37 +400,43 @@ export class GradesScreen implements OnInit, OnDestroy {
   saveStudentGrade(student: Student): void {
     const subjectId = this.selectedSubjectId();
     const activity = this.selectedActivity();
-    const score = this.gradeDraft(student.id);
-    if (!subjectId || !activity || score === null) {
-      this.toasts.warning('Selecciona actividad y calificacion');
-      return;
-    }
+    const score = this.draftScores()[student.id];
+
+    if (!subjectId || !activity || typeof score !== 'number') return;
+
     this.savingStudentIds.update((ids) => [...ids, student.id]);
-    this.grades.upsertGrade({
-      activity_id: activity.id,
-      student_id: student.id,
-      score
-    }).pipe(
+    this.grades.upsertGrade({ activity_id: activity.id, student_id: student.id, score }).pipe(
       finalize(() => this.savingStudentIds.update((ids) => ids.filter((id) => id !== student.id))),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
-        this.toasts.success('Calificacion guardada');
         this.lastSavedAt.set(new Date());
-        this.draftScores.update((drafts) => {
+
+        // Forzamos el guardado en la caché visual para que persista
+        this.confirmedScores.update(cs => {
+          const next = { ...cs };
+          if (!next[activity.id]) next[activity.id] = {};
+          next[activity.id][student.id] = score;
+          return next;
+        });
+
+        this.draftScores.update(drafts => {
           const next = { ...drafts };
           delete next[student.id];
           return next;
         });
-        this.loadSubjectData(subjectId);
+
+        this.toasts.success('Calificación Fijada');
+        this.loadSubjectData(subjectId); // Recargamos para actualizar promedios
       },
-      error: (error: unknown) => this.toasts.error('No se guardo la calificacion', errorMessage(error))
+      error: (err: unknown) => this.toasts.error('Error al fijar', errorMessage(err))
     });
   }
 
   saveDraftGrades(): void {
     const subjectId = this.selectedSubjectId();
     const activity = this.selectedActivity();
+
     const payloads = Object.entries(this.draftScores())
       .filter(([, score]) => typeof score === 'number')
       .map(([studentId, score]) => ({
@@ -805,29 +444,81 @@ export class GradesScreen implements OnInit, OnDestroy {
         student_id: Number(studentId),
         score: Number(score)
       }));
-    if (!subjectId || !activity || !payloads.length) {
-      this.toasts.warning('No hay puntajes por guardar');
-      return;
-    }
+
+    if (!subjectId || !activity || !payloads.length) return;
+
     this.savingBatch.set(true);
     forkJoin(payloads.map((payload) => this.grades.upsertGrade(payload))).pipe(
       finalize(() => this.savingBatch.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
-        this.toasts.success('Captura guardada', `${payloads.length} calificaciones actualizadas`);
         this.lastSavedAt.set(new Date());
+
+        this.confirmedScores.update(cs => {
+          const next = { ...cs };
+          if (!next[activity.id]) next[activity.id] = {};
+          payloads.forEach(p => { next[activity.id][p.student_id] = p.score; });
+          return next;
+        });
+
         this.draftScores.set({});
+        this.toasts.success('Lote Procesado', `Se guardaron ${payloads.length} calificaciones.`);
         this.loadSubjectData(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('No se guardo la captura', errorMessage(error))
+      error: (err: unknown) => this.toasts.error('Error de lote', errorMessage(err))
     });
+  }
+
+  saveStatusLabel(): string {
+    if (this.savingBatch() || this.savingStudentIds().length) return 'Guardando en la nube...';
+    if (this.syncing()) return 'Sincronizando con el servidor...';
+    const lastSavedAt = this.lastSavedAt();
+    if (lastSavedAt) return `Guardado a las ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return 'Listo para capturar';
+  }
+
+  // --- LÓGICA MODO SIMULACIÓN ALUMNO ---
+  toggleSimulation(): void {
+    if (this.simulationMode()) {
+      this.simulationMode.set(false);
+      this.simulatedScores.set({});
+    } else {
+      this.simulationMode.set(true);
+    }
+  }
+
+  updateSimulatedScore(activityId: number, value: string): void {
+    const score = value === '' ? 0 : Number(value);
+    this.simulatedScores.update(sim => ({ ...sim, [activityId]: score }));
+  }
+
+  studentSimulatedAverage(): string {
+    const baseData = this.myStudentData();
+    if (!baseData) return '--';
+
+    let totalScore = 0;
+    const acts = this.activities();
+    if (acts.length === 0) return baseData.calificacion.toString();
+
+    // Promedio dinámico para simulación
+    acts.forEach(act => {
+      // Intenta usar la simulada, si no existe usa la real, si no existe usa 0
+      let currentVal = this.simulatedScores()[act.id];
+      if (currentVal === undefined) {
+         const realVal = this.getScoreForMatrix(act.id, baseData.id);
+         currentVal = realVal === '--' ? 0 : Number(realVal);
+      }
+      totalScore += (currentVal / act.max_puntos) * 10;
+    });
+
+    return (totalScore / acts.length).toFixed(1);
   }
 
   private startPolling(subjectId: number): void {
     this.pollSubscription?.unsubscribe();
     this.pollSubscription = interval(30_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      if (!this.hasDrafts() && !this.savingBatch() && !this.savingStudentIds().length) {
+      if (!this.hasDrafts() && !this.savingBatch() && !this.savingStudentIds().length && !this.hasWeightChanges()) {
         this.loadSubjectData(subjectId);
       }
     });
@@ -837,4 +528,18 @@ export class GradesScreen implements OnInit, OnDestroy {
     this.pollSubscription?.unsubscribe();
     this.pollSubscription = undefined;
   }
+
+
+  studentAverage(studentId: number): number | string {
+
+  const row = this.summary().find(
+    (item) => item.alumno_id === studentId
+  );
+
+  if (!row) {
+    return '--';
+  }
+
+  return Math.round(row.promedio_real * 10) / 10;
+}
 }
