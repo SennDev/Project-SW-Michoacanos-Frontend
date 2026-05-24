@@ -208,7 +208,7 @@
 .exceptions-card { grid-area: exceptions; }
 .trend-card { grid-area: trend; }
 .action-card { grid-area: actions; }
-.focus-card { grid-area: focus; }
+.focus-card { grid-area: focus; min-height: 100px; }
 .service-card, .guidance-card { grid-area: side; }
 
 /* Cabeceras Internas */
@@ -233,6 +233,9 @@
   min-height: 0;
 
   &.scrollable { overflow-y: auto; padding-right: 6px; }
+  &.scrollable:has(.exception-row:only-child) {
+    overflow-y: visible;
+  }
 
   /* Utilidad crítica para centrar elementos (como el Pastel) sin importar la altura */
   &.center-flex {
@@ -300,6 +303,9 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
 
   a {
     display: flex;
@@ -311,6 +317,8 @@
     background: var(--agm-surface-muted);
     text-decoration: none;
     transition: all 0.2s ease;
+    min-height: 20px;
+    flex-shrink: 0;
 
     &:hover {
       transform: translateX(4px);
