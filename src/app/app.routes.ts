@@ -11,7 +11,7 @@ export const routes: Routes = [
   },
   {
     path: 'about',
-    loadComponent: () => import('./screens/public/about.screen').then((m) => m.AboutScreen)
+    loadComponent: () => import('./screens/public/about/about.screen').then((m) => m.AboutScreen)
   },
   {
     path: 'auth/login',

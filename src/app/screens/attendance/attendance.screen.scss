@@ -1,12 +1,15 @@
 /* ==========================================================================
    1. CORE: LAYOUT Y DARK MODE COMPATIBLE
    ========================================================================== */
+   
 :host {
   display: block;
-  min-height: calc(100vh - 84px);
+  min-height: 75vh;
   background-color: var(--agm-bg, #f8fafc);
-  box-sizing: border-box;
   color: var(--agm-text);
+  box-sizing: border-box;
+  border-radius: 16px;
+  padding: 24px;
 }
 
 .last-sync-text {
