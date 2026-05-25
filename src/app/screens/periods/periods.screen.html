@@ -1,0 +1,233 @@
+<agm-page-header
+  eyebrow="Planeación y Ciclos Escolares"
+  title="Gestión Académica de Periodos"
+  description="Administra los ciclos escolares, importa la programación y gestiona la tira de materias.">
+
+  <div class="header-actions">
+    <button class="btn ghost outline" type="button" (click)="load()">Sincronizar Datos</button>
+  </div>
+</agm-page-header>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="periods-dashboard-wrapper">
+
+    <section class="context-banner">
+      <article class="dashboard-card active-period-card">
+        <label class="context-label">Periodo Vigente (Activo)</label>
+        @if (activePeriod(); as active) {
+          <div class="active-details">
+            <h2>{{ active.nombre }}</h2>
+            <p class="plan-subtitle">{{ active.plan_estudios }}</p>
+            <div class="date-range">
+              <span class="date-badge"><strong>Inicio:</strong> {{ active.fecha_inicio | date:'longDate' }}</span>
+              <span class="date-badge"><strong>Cierre:</strong> {{ active.fecha_fin | date:'longDate' }}</span>
+            </div>
+          </div>
+        } @else {
+          <div class="active-details empty">
+            <h2>Sistema Inactivo</h2>
+            <p>No hay ningún periodo activo. El sistema está pausado.</p>
+          </div>
+        }
+      </article>
+
+      <div class="kpi-tray">
+        @if (isAdmin()) {
+          <agm-kpi-card label="Periodos Históricos" [value]="periods().length" tone="neutral" />
+          <agm-kpi-card label="Materias del Periodo" [value]="subjects().length" tone="primary" />
+          <agm-kpi-card label="Estado Sistema" [value]="activePeriod() ? 'Operando' : 'Detenido'" [tone]="activePeriod() ? 'success' : 'danger'" />
+        }
+        @if (isTeacher()) {
+          <agm-kpi-card label="Materias Asignadas" [value]="subjects().length" tone="primary" />
+          <agm-kpi-card label="Estado Semestral" value="En Curso" tone="success" />
+        }
+        @if (isStudent()) {
+          <agm-kpi-card label="Materias Inscritas" [value]="subjects().length" tone="primary" />
+          <agm-kpi-card label="Bajas en Proceso" [value]="pendingWithdrawalsCount()" [tone]="pendingWithdrawalsCount() > 0 ? 'warning' : 'neutral'" />
+          <agm-kpi-card label="Estatus Académico" value="Regular" tone="success" />
+        }
+      </div>
+    </section>
+
+    @if (isAdmin()) {
+      <div class="dashboard-grid admin-layout">
+
+        <aside class="setup-column">
+          <article class="dashboard-card form-card">
+            <div class="card-header">
+              <h3>{{ editingId() ? 'Modificar Periodo' : 'Aperturar Periodo' }}</h3>
+              @if (editingId()) { <button class="btn ghost small" (click)="resetForm()">Cancelar</button> }
+            </div>
+
+            <form class="form-body" [formGroup]="form" (ngSubmit)="save()" novalidate>
+              <div class="field">
+                <label>Nombre del Ciclo</label>
+                <input formControlName="nombre" placeholder="Ej. Otoño 2026" [class.is-invalid]="showControlError('nombre')">
+              </div>
+
+              <div class="field">
+                <label>Plan de Estudios (Carrera)</label>
+                <select class="agm-select" formControlName="plan_estudios" [class.is-invalid]="showControlError('plan_estudios')">
+                  <option value="" disabled>-- Selecciona el programa --</option>
+                  @for (plan of studyPlans; track plan) { <option [value]="plan">{{ plan }}</option> }
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="field">
+                  <label>Apertura</label>
+                  <input type="date" formControlName="fecha_inicio" [class.is-invalid]="showControlError('fecha_inicio') || hasDateRangeError()">
+                </div>
+                <div class="field">
+                  <label>Clausura</label>
+                  <input type="date" formControlName="fecha_fin" [class.is-invalid]="showControlError('fecha_fin') || hasDateRangeError()">
+                </div>
+              </div>
+              @if (hasDateRangeError()) { <span class="field-error text-center">Fechas incongruentes.</span> }
+
+              <div class="card-footer mt-auto">
+                <p class="muted-text text-sm">Este periodo será el activo por defecto.</p>
+                <button class="btn primary block" type="submit" [disabled]="form.invalid || saving()">
+                  {{ saving() ? 'Procesando...' : (editingId() ? 'Guardar Cambios' : 'Generar Periodo') }}
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="dashboard-card import-card">
+            <div class="card-header">
+              <h3>Importación de Catálogo</h3>
+            </div>
+            <div class="card-body">
+              <p class="muted-text">Carga la sábana oficial de materias de la institución.</p>
+              <agm-file-upload-card
+                title="Sábana Académica"
+                hint="Documento PDF oficial de la BUAP."
+                accept=".pdf"
+                actionLabel="Extraer Materias"
+                [loading]="importing()"
+                (upload)="importSchedule($event)" />
+            </div>
+          </article>
+        </aside>
+
+        <main class="execution-column">
+          <article class="dashboard-card">
+            <div class="card-header">
+              <h3>Registro Histórico de Periodos</h3>
+            </div>
+            <div class="table-container">
+              <agm-searchable-table
+                [rows]="periods()"
+                [columns]="periodColumns"
+                placeholder="Buscar por ciclo o plan..."
+                [actions]="periodActions"
+                emptyTitle="Sin periodos"
+                emptyMessage="Utiliza el formulario de la izquierda para crear tu primer ciclo."
+              />
+
+              <ng-template #periodActions let-period>
+                <div class="table-actions">
+                  <button class="btn ghost small" type="button" (click)="edit(period)">Editar</button>
+                  <button class="btn danger small outline" type="button" [disabled]="period.activo" (click)="askDelete(period)">
+                    {{ period.activo ? 'Vigente' : 'Borrar' }}
+                  </button>
+                </div>
+              </ng-template>
+            </div>
+          </article>
+        </main>
+      </div>
+    }
+
+    @if (isStudent() || isTeacher()) {
+      <div class="user-dashboard-layout">
+
+        <div class="dashboard-section-header">
+          <div class="title-group">
+            <h2>{{ isStudent() ? 'Mi Tira de Materias' : 'Mis Grupos Asignados' }}</h2>
+            <p>Listado oficial de asignaturas para el periodo {{ activePeriod()?.nombre || 'vigente' }}.</p>
+          </div>
+        </div>
+
+        @if (subjects().length) {
+          <div class="subjects-grid">
+            @for (subject of subjects(); track subject.id) {
+
+              <article class="subject-card" [class.is-pending]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'">
+
+                @if ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') {
+                  <div class="pending-ribbon">Revisión en Proceso</div>
+                }
+
+                <div class="sub-header">
+                  <span class="nrc-badge">NRC {{ subject.nrc }}</span>
+                  <span class="status-badge"
+                        [class.success]="subject.estado === 'abierta'"
+                        [class.warning]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'">
+                    {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Baja Solicitada' : subject.estado }}
+                  </span>
+                </div>
+
+                <div class="sub-body">
+                  <h4 class="subject-title">{{ subject.nombre }}</h4>
+                  <p class="teacher-name">
+                    <span class="icon" aria-hidden="true">👨‍🏫</span>
+                    {{ isStudent() ? (subject.docente_nombre || 'Docente por asignar') : 'Tú eres el titular' }}
+                  </p>
+                </div>
+
+                <div class="sub-footer">
+                  <div class="tags-group">
+                    <span class="tag">Sec: {{ subject.seccion }}</span>
+                    <span class="tag">Cred: {{ $any(subject).creditos || 6 }}</span>
+                  </div>
+
+                  @if (isStudent()) {
+                    <button class="btn action-btn block"
+                            [class.danger]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
+                            [class.outline]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
+                            [class.disabled]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'"
+                            [disabled]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'"
+                            (click)="askSubjectWithdrawal(subject)">
+                      {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Solicitud Enviada' : 'Solicitar Baja' }}
+                    </button>
+                  }
+                  @if (isTeacher()) {
+                    <button class="btn primary small outline block">Ver Alumnos</button>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state-wrapper">
+            <agm-empty-state title="Tira Vacía" message="No hay materias cargadas o vinculadas a ti en este periodo." />
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
+
+<agm-confirmation-modal
+  [open]="Boolean(periodToDelete())"
+  title="Advertencia Destructiva"
+  [message]="'Estás a punto de eliminar definitivamente el periodo ' + (periodToDelete()?.nombre || '') + '. Se perderán todas las relaciones de materias. ¿Continuar?'"
+  confirmLabel="Eliminar Definitivamente"
+  confirmTone="danger"
+  (confirm)="deletePeriod()"
+  (cancel)="periodToDelete.set(null)"
+/>
+
+<agm-confirmation-modal
+  [open]="Boolean(subjectWithdrawal())"
+  title="Confirmar Solicitud de Baja"
+  [message]="'¿Deseas solicitar tu baja oficial de la materia ' + (subjectWithdrawal()?.nombre || '') + '? Esta petición será enviada a Administración y no puede deshacerse.'"
+  confirmLabel="Enviar Solicitud"
+  confirmTone="warning"
+  (confirm)="confirmWithdrawalRequest()"
+  (cancel)="subjectWithdrawal.set(null)"
+/>

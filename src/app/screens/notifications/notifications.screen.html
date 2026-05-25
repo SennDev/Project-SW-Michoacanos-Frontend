@@ -1,0 +1,249 @@
+<agm-page-header
+  eyebrow="Consola del Administrador"
+  title="Motor Transaccional de Correos"
+  description="Prueba y dispara notificaciones del sistema de forma segura. Validado contra errores 422."
+/>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="notifications-dashboard">
+
+    <aside class="sidebar-nav">
+      <nav aria-label="Secciones de Notificación">
+        <button [class.active]="activeTab() === 'welcome'" (click)="activeTab.set('welcome')">
+          <span class="icon"></span> Bienvenida (Alta)
+        </button>
+        <button [class.active]="activeTab() === 'baja'" (click)="activeTab.set('baja')">
+          <span class="icon"></span> Alerta de Baja
+        </button>
+        <button [class.active]="activeTab() === 'closure'" (click)="activeTab.set('closure')">
+          <span class="icon"></span> Cierre de Materia
+        </button>
+        <button [class.active]="activeTab() === 'reset'" (click)="activeTab.set('reset')">
+          <span class="icon"></span> Recuperar Acceso
+        </button>
+        <div class="nav-divider"></div>
+        <button [class.active]="activeTab() === 'logs'" (click)="activeTab.set('logs')">
+          <span class="icon"></span> Bitácora del Motor
+        </button>
+      </nav>
+    </aside>
+
+    <main class="content-panel">
+
+      @if (activeTab() === 'welcome') {
+        <article class="endpoint-card">
+          <div class="card-header">
+            <div class="header-titles">
+              <h3>Alta de Alumno (Bienvenida)</h3>
+              <p class="muted">Envía credenciales de acceso únicas a un alumno tras registrar su inscripción.</p>
+            </div>
+            <agm-status-badge label="POST /notificaciones/bienvenida" tone="info" />
+          </div>
+
+          <form class="card-body" [formGroup]="welcomeForm" (ngSubmit)="sendWelcome()">
+
+            <div class="form-grid cols-2">
+              <div class="field">
+                <label>1. Materia de Inscripción</label>
+                <select class="agm-select" formControlName="materia_id">
+                  <option [ngValue]="null" disabled>-- Elige una materia --</option>
+                  @for (sub of subjects(); track sub.id) { <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option> }
+                </select>
+              </div>
+
+              <div class="field">
+                <label>2. Alumno Destinatario</label>
+                <select class="agm-select" formControlName="alumno_id" [disabled]="!welcomeForm.controls.materia_id.value || filteredStudents().length === 0">
+                  <option [ngValue]="null" disabled>-- Selecciona al alumno --</option>
+                  @for (student of filteredStudents(); track student.id) { <option [ngValue]="student.id">{{ student.nombre }} ({{ student.matricula }})</option> }
+                </select>
+                @if (welcomeForm.controls.materia_id.value && filteredStudents().length === 0) {
+                  <span class="field-hint">No hay alumnos inscritos o activos en esta materia.</span>
+                }
+              </div>
+            </div>
+
+            <div class="form-divider"><span>Datos Autocompletados</span></div>
+
+            <div class="form-grid cols-2">
+              <div class="field">
+                <label>Nombre del Alumno</label>
+                <input class="agm-input" formControlName="nombre" placeholder="Se llena automáticamente" readonly>
+              </div>
+              <div class="field">
+                <label>Correo Destino</label>
+                <input class="agm-input" type="email" formControlName="email" placeholder="usuario@dominio.edu.mx" readonly>
+              </div>
+            </div>
+
+            <div class="field mt-16">
+              <label>Contraseña Temporal (Obligatoria)</label>
+              <input class="agm-input" formControlName="temporary_password" placeholder="Asigna una clave segura ej. Temp1234!">
+              @if (welcomeForm.controls.temporary_password.touched && welcomeForm.controls.temporary_password.invalid) {
+                <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
+              }
+            </div>
+
+            <div class="card-footer">
+              <button class="btn primary" type="submit" [disabled]="welcomeForm.invalid || sending()">
+                {{ sending() ? 'Conectando con el motor...' : 'Disparar Correo de Bienvenida' }}
+              </button>
+            </div>
+          </form>
+        </article>
+      }
+
+      @if (activeTab() === 'baja') {
+        <article class="endpoint-card warning-theme">
+          <div class="card-header">
+            <div class="header-titles">
+              <h3>Alerta de Baja Académica</h3>
+              <p class="muted">Notifica administrativamente que una relación Alumno-Materia ha sido revocada (Soft-Delete).</p>
+            </div>
+            <agm-status-badge label="POST /notificaciones/baja" tone="warning" />
+          </div>
+
+          <form class="card-body" [formGroup]="bajaForm" (ngSubmit)="sendBaja()">
+            <div class="form-grid cols-2">
+              <div class="field">
+                <label>1. Selecciona la Materia</label>
+                <select class="agm-select" formControlName="materia_id">
+                  <option [ngValue]="null" disabled>-- Elige una materia --</option>
+                  @for (sub of subjects(); track sub.id) { <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option> }
+                </select>
+              </div>
+
+              <div class="field">
+                <label>2. Alumno a Dar de Baja</label>
+                <select class="agm-select" formControlName="alumno_id" [disabled]="!bajaForm.controls.materia_id.value || filteredStudents().length === 0">
+                  <option [ngValue]="null" disabled>-- Identifica al alumno --</option>
+                  @for (student of filteredStudents(); track student.id) { <option [ngValue]="student.id">{{ student.nombre }}</option> }
+                </select>
+              </div>
+            </div>
+
+            <div class="warning-banner mt-16">
+              <strong>Atención:</strong> Esta acción disparará un correo informativo al Docente titular y al Alumno confirmando el movimiento en el sistema.
+            </div>
+
+            <div class="card-footer">
+              <button class="btn danger" type="submit" [disabled]="bajaForm.invalid || sending()">
+                {{ sending() ? 'Procesando...' : 'Ejecutar Alerta de Baja' }}
+              </button>
+            </div>
+          </form>
+        </article>
+      }
+
+      @if (activeTab() === 'closure') {
+        <article class="endpoint-card success-theme">
+          <div class="card-header">
+            <div class="header-titles">
+              <h3>Publicación de Calificaciones Finales</h3>
+              <p class="muted">Informa a la plantilla de alumnos que el ciclo ha concluido y las notas están listas.</p>
+            </div>
+            <agm-status-badge label="POST /notificaciones/cierre-materia" tone="success" />
+          </div>
+
+          <form class="card-body" [formGroup]="closureForm" (ngSubmit)="sendClosure()">
+            <div class="form-grid cols-2">
+              <div class="field">
+                <label>Asignatura Concluida</label>
+                <select class="agm-select" formControlName="materia_id">
+                  <option [ngValue]="null" disabled>-- Selecciona la asignatura --</option>
+                  @for (sub of subjects(); track sub.id) { <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option> }
+                </select>
+              </div>
+              <div class="field">
+                <label>Verificación del Sistema</label>
+                <input class="agm-input" type="text" formControlName="materia_nombre" readonly placeholder="Esperando selección...">
+              </div>
+            </div>
+
+            <div class="field mt-16">
+              <label>Destinatarios Extra (Opcional - CSV)</label>
+              <textarea class="agm-input" rows="3" formControlName="closureEmails" placeholder="coordinacion@buap.mx, auditoria@buap.mx"></textarea>
+              <span class="field-hint">Los alumnos inscritos serán notificados de forma automática. Usa este campo solo para copias de carbón administrativas.</span>
+            </div>
+
+            <div class="card-footer">
+              <button class="btn success" type="submit" [disabled]="closureForm.invalid || sending()">
+                {{ sending() ? 'Disparando lotes...' : 'Avisar Cierre a Todo el Grupo' }}
+              </button>
+            </div>
+          </form>
+        </article>
+      }
+
+      @if (activeTab() === 'reset') {
+        <article class="endpoint-card">
+          <div class="card-header">
+            <div class="header-titles">
+              <h3>Restablecimiento de Credenciales</h3>
+              <p class="muted">Genera y envía un token seguro JWT para la recuperación de cuentas (Arquitectura Global).</p>
+            </div>
+            <agm-status-badge label="POST /notificaciones/reset-password" tone="info" />
+          </div>
+
+          <form class="card-body" [formGroup]="resetForm" (ngSubmit)="sendReset()">
+
+            <div class="info-banner mb-24">
+              En este módulo, los alumnos se cargan desde el <strong>Directorio Global</strong>. No necesitas saber a qué materia pertenecen.
+            </div>
+
+            <div class="form-grid cols-2">
+              <div class="field">
+                <label>Buscar Alumno (Directorio Global)</label>
+                <select class="agm-select" formControlName="global_alumno_id">
+                  <option [ngValue]="null">-- Búsqueda manual (o teclea el correo) --</option>
+                  @for (student of globalStudents(); track student.id) { <option [ngValue]="student.id">{{ student.nombre }} ({{ student.matricula }})</option> }
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Correo Electrónico a Notificar</label>
+                <input class="agm-input" type="email" formControlName="email" placeholder="usuario@alumno.buap.mx">
+                @if (resetForm.controls.email.touched && resetForm.controls.email.invalid) {
+                  <span class="field-error">Se requiere un correo institucional válido.</span>
+                }
+              </div>
+            </div>
+
+            <div class="field mt-16">
+              <label>Token Hash de Recuperación</label>
+              <input class="agm-input" type="text" formControlName="reset_token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+              @if (resetForm.controls.reset_token.touched && resetForm.controls.reset_token.invalid) {
+                <span class="field-error">El payload del token JWT no puede ir vacío.</span>
+              }
+            </div>
+
+            <div class="card-footer">
+              <button class="btn primary" type="submit" [disabled]="resetForm.invalid || sending()">
+                {{ sending() ? 'Validando...' : 'Transmitir Enlace de Recuperación' }}
+              </button>
+            </div>
+          </form>
+        </article>
+      }
+
+      @if (activeTab() === 'logs') {
+        <article class="endpoint-card">
+          <div class="card-header">
+            <h3>Centro de Bitácora REST</h3>
+            <input class="search-input" type="search" placeholder="🔍 Buscar por destinatario..." disabled>
+          </div>
+
+          <div class="logs-empty-container">
+            <agm-empty-state
+              title="Módulo de Lectura en Desarrollo"
+              message="El motor ms-notifications actualmente procesa envíos de manera unidireccional exitosamente. El endpoint GET para leer el historial de auditoría está programado para la siguiente fase."
+            />
+          </div>
+        </article>
+      }
+
+    </main>
+  </div>
+}
