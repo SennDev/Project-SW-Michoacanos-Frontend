@@ -13,7 +13,6 @@ import { GradesService } from '../../services/grades.service';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
-import { SearchableTableComponent } from '../../shared/components/searchable-table/searchable-table.component';
 import { FileUploadCardComponent } from '../../shared/components/file-upload-card/file-upload-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { LoadingSkeletonComponent } from '../../shared/components/loading-skeleton/loading-skeleton.component';
@@ -31,7 +30,7 @@ interface WeightDraft {
   standalone: true,
   imports: [
     CommonModule, FormsModule, DatePipe, PageHeaderComponent, KpiCardComponent,
-    SearchableTableComponent, FileUploadCardComponent, EmptyStateComponent,
+    FileUploadCardComponent, EmptyStateComponent,
     LoadingSkeletonComponent
   ],
   templateUrl: './grades.screen.html',
@@ -83,7 +82,7 @@ export class GradesScreen implements OnInit, OnDestroy {
 
   // --- SISTEMA MODO SIMULACIÓN (ALUMNOS) ---
   readonly simulationMode = signal(false);
-  readonly simulatedScores = signal<Record<number, number>>({});
+  readonly simulatedScores = signal<Record<number, number | undefined>>({});
 
   // --- COMPUTADOS ---
   readonly isTeacher = computed(() => this.auth.role() === 'admin' || this.auth.role() === 'docente');

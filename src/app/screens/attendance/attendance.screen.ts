@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SlicePipe, UpperCasePipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Subscription, forkJoin, interval, of } from 'rxjs';
 import { catchError, delay, finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -44,7 +44,7 @@ type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => Barc
   standalone: true,
   imports: [
     PageHeaderComponent, LoadingSkeletonComponent, EmptyStateComponent,
-    FormsModule, KpiCardComponent, SearchableTableComponent, SlicePipe, UpperCasePipe, DatePipe
+    FormsModule, KpiCardComponent, SearchableTableComponent, DatePipe
   ],
   templateUrl: './attendance.screen.html',
   styleUrl: './attendance.screen.scss'
@@ -94,6 +94,7 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   private scannerStream?: MediaStream;
   private scannerFrameId?: number;
   private detector?: BarcodeDetectorLike;
+  private readonly sessionDurationMs = 10 * 60 * 1000;
 
   readonly isTeacher = computed(() => this.auth.role() === 'admin' || this.auth.role() === 'docente');
   readonly isStudent = computed(() => this.auth.role() === 'alumno');
@@ -189,8 +190,8 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     const session = this.activeSession();
     if (!session) return '';
 
-    const start = new Date((session as any).created_at || (session as any).creado_en || Date.now());
-    const closesAt = new Date(start.getTime() + 600000); // 10 minutos
+    const start = new Date(this.sessionStartMs(session));
+    const closesAt = new Date(this.sessionClosesAtMs(session));
 
     const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
     const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
@@ -247,7 +248,9 @@ export class AttendanceScreen implements OnInit, OnDestroy {
   }
 
   loadAttendance(subjectId: number, finishLoading = false): void {
-    this.sessions.set(this.attendance.getLocalSessions(subjectId));
+    const localSessions = this.attendance.getLocalSessions(subjectId);
+    this.sessions.set(localSessions);
+    this.recoverActiveSession(subjectId, localSessions);
     this.syncing.set(true);
     this.attendance.attendanceHistory(subjectId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (history) => {
@@ -318,22 +321,63 @@ export class AttendanceScreen implements OnInit, OnDestroy {
     if (this.timerSub) this.timerSub.unsubscribe();
 
     if (session) {
+      this.updateSessionTimer(session);
       this.timerSub = interval(1000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-        const createdAt = new Date(session.created_at || session.creado_en || Date.now()).getTime();
-        const expiresAt = createdAt + 600000; // 10 Minutos exactos
-        const diff = expiresAt - Date.now();
-
-        if (diff <= 0) {
-          this.closeSession();
-        } else {
-          const m = Math.floor(diff / 60000).toString().padStart(2, '0');
-          const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-          this.timeLeftLabel.set(`${m}:${s}`);
-        }
+        this.updateSessionTimer(session);
       });
     } else {
       this.timeLeftLabel.set('00:00');
     }
+  }
+
+  private updateSessionTimer(session: any): void {
+    const diff = this.sessionClosesAtMs(session) - Date.now();
+
+    if (diff <= 0) {
+      this.timeLeftLabel.set('00:00');
+      this.activeSession.set(null);
+      this.stopScanner();
+      this.timerSub?.unsubscribe();
+      this.timerSub = undefined;
+      return;
+    }
+
+    const m = Math.floor(diff / 60000).toString().padStart(2, '0');
+    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+    this.timeLeftLabel.set(`${m}:${s}`);
+  }
+
+  private recoverActiveSession(subjectId: number, localSessions: AttendanceSession[]): void {
+    const current = this.activeSession();
+    const currentSubjectId = Number((current as any)?.materia_id);
+
+    if (current && currentSubjectId === subjectId && this.isSessionOpen(current)) {
+      this.setActiveSession(current);
+      return;
+    }
+
+    const recoverable = localSessions
+      .filter((session) => this.isSessionOpen(session))
+      .sort((a, b) => this.sessionClosesAtMs(b) - this.sessionClosesAtMs(a))[0] ?? null;
+
+    this.setActiveSession(recoverable);
+  }
+
+  private isSessionOpen(session: any): boolean {
+    const status = String(session?.status ?? 'abierta').toLowerCase();
+    return status !== 'cerrada' && status !== 'cerrado' && this.sessionClosesAtMs(session) > Date.now();
+  }
+
+  private sessionStartMs(session: any): number {
+    const raw = session?.started_at || session?.created_at || session?.creado_en;
+    const parsed = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  }
+
+  private sessionClosesAtMs(session: any): number {
+    const raw = session?.closes_at || session?.expires_at || session?.expira_en;
+    const parsed = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : this.sessionStartMs(session) + this.sessionDurationMs;
   }
 
   closeSession(): void {

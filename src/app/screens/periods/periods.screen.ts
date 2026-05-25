@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { finalize, of, delay } from 'rxjs';
+import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { AuthService } from '../../core/auth/auth.service';
@@ -225,14 +225,16 @@ export class PeriodsScreen implements OnInit {
   confirmWithdrawalRequest(): void {
     const target = this.subjectWithdrawal();
     if (!target) return;
+    const profileId = this.auth.user()?.profile_id;
+
+    if (!profileId) {
+      this.toasts.error('Perfil incompleto', 'No se pudo identificar tu expediente de alumno.');
+      return;
+    }
 
     this.isWithdrawing.set(true);
 
-    const request = (this.academics as any).requestSubjectWithdrawal
-      ? (this.academics as any).requestSubjectWithdrawal(target.id)
-      : (this.academics as any).updateStudentStatus ? (this.academics as any).updateStudentStatus(target.id, 'baja_solicitada') : of({success: true});
-
-    request.pipe(
+    this.academics.withdrawStudent(profileId, target.id, 'Baja solicitada por el alumno desde AGM').pipe(
       finalize(() => {
         this.isWithdrawing.set(false);
         this.subjectWithdrawal.set(null);
@@ -240,12 +242,8 @@ export class PeriodsScreen implements OnInit {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
-        this.toasts.success('Baja en Proceso', 'El administrador fue notificado para su aprobación.');
-
-        // Actualización Visual Inmediata Optímista.
-        this.subjects.update(list => list.map(sub =>
-          sub.id === target.id ? { ...sub, status: 'baja_solicitada', estado: 'baja_solicitada' } : sub
-        ));
+        this.toasts.success('Baja registrada', 'El backend registró la baja y notificó al docente cuando está disponible.');
+        this.load();
       },
       error: (err: unknown) => this.toasts.error('Error de Servidor', errorMessage(err))
     });

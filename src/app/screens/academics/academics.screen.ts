@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { forkJoin, finalize, of, interval } from 'rxjs';
-import { catchError, delay } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 
@@ -113,7 +113,7 @@ export class AcademicsScreen implements OnInit {
 
   private loadStudents(subjectId: number, isSilent = false): void {
     if (!isSilent) this.students.set([]);
-    this.academics.listStudentsBySubject(subjectId)
+    this.academics.listStudentsBySubject(subjectId, this.isAdmin())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (data) => {
@@ -178,10 +178,11 @@ export class AcademicsScreen implements OnInit {
   confirmWithdrawal(): void {
     const target = this.studentToWithdraw();
     if (!target) return;
+    const subjectId = this.selectedSubjectId();
+    if (!subjectId) return;
 
     this.isWithdrawing.set(true);
-    of({ success: true }).pipe(
-      delay(800),
+    this.academics.withdrawStudent(target.id, subjectId, 'Baja aprobada por administracion desde AGM').pipe(
       finalize(() => {
         this.isWithdrawing.set(false);
         this.studentToWithdraw.set(null);
@@ -190,7 +191,7 @@ export class AcademicsScreen implements OnInit {
     ).subscribe({
       next: () => {
         this.toasts.success('Baja Confirmada', `Se procesó la baja del alumno correctamente.`);
-        this.students.update(list => list.filter(s => s.id !== target.id));
+        this.loadStudents(subjectId);
       },
       error: (err: any) => this.toasts.error('Error en Baja', errorMessage(err))
     });

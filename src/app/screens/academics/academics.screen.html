@@ -151,9 +151,11 @@
                             <button
                               class="btn small"
                               [class.danger]="student.status === 'baja_solicitada'"
+                              [class.outline]="student.activo === false"
                               [class.btn-neutral]="student.status !== 'baja_solicitada'"
+                              [disabled]="student.activo === false"
                               (click)="reviewWithdrawal(student)">
-                              Revisar Baja
+                              {{ student.activo === false ? 'Baja procesada' : 'Revisar Baja' }}
                             </button>
                           </td>
                         }
