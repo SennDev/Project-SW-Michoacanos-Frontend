@@ -7,11 +7,11 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () => import('./screens/public/landing.screen').then((m) => m.LandingScreen)
+    loadComponent: () => import('./screens/public/landing/landing.screen').then((m) => m.LandingScreen)
   },
   {
     path: 'about',
-    loadComponent: () => import('./screens/public/about.screen').then((m) => m.AboutScreen)
+    loadComponent: () => import('./screens/public/about/about.screen').then((m) => m.AboutScreen)
   },
   {
     path: 'auth/login',

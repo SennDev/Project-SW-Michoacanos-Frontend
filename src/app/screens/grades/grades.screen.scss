@@ -7,6 +7,8 @@
   background-color: var(--agm-bg, #f8fafc);
   color: var(--agm-text);
   box-sizing: border-box;
+  border-radius: 16px;
+  padding: 24px;
 }
 
 .header-actions {
@@ -114,6 +116,7 @@
   p { margin: 0; font-size: 1.05rem; color: var(--agm-text); flex: 1; min-width: 280px; line-height: 1.6; letter-spacing: 0.2px;}
   .sim-actions { display: flex; gap: 12px; }
 
+
   .simulation-btn {
     background: linear-gradient(135deg, #d946ef, #9333ea); color: white; border: none; font-weight: 800; padding: 12px 24px; font-size: 1rem; box-shadow: 0 4px 16px rgba(147, 51, 234, 0.3);
     &:hover { box-shadow: 0 6px 20px rgba(147, 51, 234, 0.4); transform: translateY(-1px); }
@@ -142,7 +145,7 @@
    5. NAVEGACIÓN Y TABS DEL DOCENTE
    ========================================================================== */
 .teacher-tabs {
-  display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--agm-border); overflow-x: auto;
+  display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--agm-border);
   button {
     background: transparent; border: none; padding: 16px 24px; font-size: 1.05rem; font-weight: 800; color: var(--agm-text-soft); cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; margin-bottom: -2px; letter-spacing: 0.3px; white-space: nowrap;
     &:hover { color: var(--agm-text); }
