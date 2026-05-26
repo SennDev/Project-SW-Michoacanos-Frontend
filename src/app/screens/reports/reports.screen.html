@@ -1,0 +1,152 @@
+<agm-page-header
+  eyebrow="Análisis y Exportaciones"
+  title="Centro de Reportes Académicos"
+  description="Consulta métricas de rendimiento y genera documentos oficiales consolidados en formato PDF o Excel.">
+
+  <div class="header-actions">
+    <button class="btn ghost outline" type="button" (click)="load()">Actualizar Datos</button>
+  </div>
+</agm-page-header>
+
+@if (loading()) {
+  <agm-loading-skeleton [rows]="6" />
+} @else {
+  <div class="reports-dashboard-wrapper">
+
+    <section class="context-dashboard">
+      <article class="dashboard-card pad subject-selector-card">
+        <label class="card-label">Contexto de Materia</label>
+        <div class="select-wrapper">
+          <select class="agm-select-lg" [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
+            <option [ngValue]="null" disabled>-- Despliega para seleccionar una materia --</option>
+            @for (subject of subjects(); track subject.id) {
+              <option [ngValue]="subject.id">{{ subject.nombre }} (NRC: {{ subject.nrc }})</option>
+            }
+          </select>
+        </div>
+      </article>
+
+      <div class="kpi-group">
+        <agm-kpi-card label="Materias Disponibles" [value]="subjects().length" tone="primary" />
+
+        @if (selectedSubjectId()) {
+          <agm-kpi-card label="Promedio del Grupo" [value]="selectedSubjectAverage()" [tone]="selectedSubjectAverage() >= '70' ? 'success' : 'warning'" />
+          <agm-kpi-card label="Alumnos en Riesgo" [value]="atRiskStudents().length" [tone]="atRiskStudents().length > 0 ? 'danger' : 'success'" />
+        }
+      </div>
+    </section>
+
+    @if (canExport()) {
+      <div class="dashboard-grid main-export-layout">
+
+        <article class="dashboard-card export-engine-card">
+          <div class="card-header border-bottom">
+            <div class="title-block">
+              <h3>Generador de Archivos Oficiales</h3>
+              <p class="muted-text">Extrae la información consolidada de la materia seleccionada.</p>
+            </div>
+
+            <div class="format-toggle">
+              <label [class.active]="format === 'pdf'">
+                <input type="radio" name="format" value="pdf" [(ngModel)]="format"> Formato PDF
+              </label>
+              <label [class.active]="format === 'xlsx'">
+                <input type="radio" name="format" value="xlsx" [(ngModel)]="format"> Formato XLSX
+              </label>
+            </div>
+          </div>
+
+          <div class="card-body export-actions-grid">
+            <div class="export-action-box">
+              <div class="box-header">
+                <span class="format-badge">EXPORTAR</span>
+                <h4>Calificaciones</h4>
+              </div>
+              <p class="muted-text">Concentrado final del periodo escolar detallado por alumno.</p>
+              <button class="btn primary block action-btn" [disabled]="exporting() || !selectedSubjectId()" (click)="export('calificaciones')">
+                {{ exporting() ? 'Procesando Documento...' : 'Descargar Archivo' }}
+              </button>
+            </div>
+
+            <div class="export-action-box">
+              <div class="box-header">
+                <span class="format-badge">EXPORTAR</span>
+                <h4>Listas de Asistencia</h4>
+              </div>
+              <p class="muted-text">Historial de sesiones impartidas y porcentajes de faltas.</p>
+              <button class="btn primary block action-btn" [disabled]="exporting() || !selectedSubjectId()" (click)="export('asistencias')">
+                {{ exporting() ? 'Procesando Documento...' : 'Descargar Archivo' }}
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <aside class="dashboard-card risk-panel">
+          <div class="card-header border-bottom">
+            <div class="title-block">
+              <h3>Foco de Atención</h3>
+              <p class="muted-text">Alumnos con promedio inferior a 70 en el grupo actual.</p>
+            </div>
+            @if (atRiskStudents().length > 0) { <agm-status-badge label="Riesgo Detectado" tone="danger" /> }
+          </div>
+
+          <div class="risk-content">
+            @if (!selectedSubjectId()) {
+              <agm-empty-state title="Materia no seleccionada" message="Elige un grupo para consultar el análisis." />
+            } @else if (atRiskStudents().length) {
+              <div class="risk-list scrollable-y">
+                @for (student of atRiskStudents(); track student.alumno_id) {
+                  <div class="risk-item">
+                    <div class="student-info">
+                      <strong>{{ student.nombre }}</strong>
+                      <span>Matrícula: {{ student.matricula }}</span>
+                    </div>
+                    <span class="score-badge danger">{{ student.promedio_real.toFixed(1) }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <agm-empty-state title="Rendimiento Óptimo" message="No hay alumnos con riesgo de reprobación." />
+            }
+          </div>
+        </aside>
+
+      </div>
+    } @else {
+      <article class="dashboard-card pad mb-24">
+        <agm-empty-state
+          title="Exportación Restringida"
+          message="La generación de sábanas oficiales está reservada para Docentes y Administradores. Tu resumen de rendimiento está disponible a continuación."
+        />
+      </article>
+    }
+
+    @if (teacherStats().length || studentStats().length) {
+      <section class="stats-overview">
+        <h3 class="section-title">Estadísticas Acumuladas del Semestre</h3>
+        <div class="stats-grid">
+          @for (stat of teacherStats(); track stat.materia_id) {
+            <article class="dashboard-card pad stat-card">
+              <h4 class="stat-title">{{ stat.materia }}</h4>
+              <div class="metric-list">
+                <div class="metric-row"><span>Promedio Grupal</span><strong>{{ stat.promedio_grupal }}</strong></div>
+                <div class="metric-row"><span>Índice Aprobación</span><strong>{{ stat.aprobacion }}%</strong></div>
+                <div class="metric-row"><span>Sesiones Impartidas</span><strong>{{ stat.sesiones }}</strong></div>
+              </div>
+            </article>
+          }
+          @for (stat of studentStats(); track stat.materia_id) {
+            <article class="dashboard-card pad stat-card">
+              <h4 class="stat-title">{{ stat.materia }}</h4>
+              <div class="metric-list">
+                <div class="metric-row"><span>Promedio Actual</span><strong>{{ stat.promedio_actual }}</strong></div>
+                <div class="metric-row"><span>Asistencias Registradas</span><strong>{{ stat.asistencias }}</strong></div>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+  </div>
+}

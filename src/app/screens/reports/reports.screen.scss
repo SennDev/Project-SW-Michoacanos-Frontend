@@ -1,0 +1,186 @@
+/* ==========================================================================
+   1. LAYOUT BASE Y SCROLL (SDCSS STRICT)
+   ========================================================================== */
+:host {
+  display: block;
+  min-height: calc(100vh - 84px);
+  background-color: var(--agm-bg, #f8fafc);
+  color: var(--agm-text);
+  box-sizing: border-box;
+}
+
+.reports-dashboard-wrapper {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ==========================================================================
+   2. COMPONENTES GLOBALES Y TARJETAS
+   ========================================================================== */
+.dashboard-card {
+  background: var(--agm-panel-bg);
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius-lg);
+  box-shadow: var(--agm-shadow-soft);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+
+  &.pad { padding: 32px; }
+
+  h3 { margin: 0; font-size: 1.25rem; color: var(--agm-text); font-weight: 800; letter-spacing: -0.3px;}
+  .muted-text { color: var(--agm-text-soft); font-size: 0.95rem; margin: 0; line-height: 1.5; letter-spacing: 0.2px;}
+
+  .card-header {
+    padding: 24px 32px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;
+    &.border-bottom { border-bottom: 1px solid var(--agm-border); }
+    .title-block { display: flex; flex-direction: column; gap: 6px; }
+  }
+
+  .card-body { padding: 32px; }
+}
+
+.mb-24 { margin-bottom: 24px; }
+
+/* Scrollbars limpias */
+.scrollable-y {
+  overflow-y: auto; padding-right: 8px;
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background-color: var(--agm-border-strong); border-radius: 10px; }
+}
+
+/* ==========================================================================
+   3. BARRA DE CONTEXTO SUPERIOR (Materia Seleccionada)
+   ========================================================================== */
+.context-dashboard {
+  display: grid;
+  grid-template-columns: minmax(380px, 1.2fr) 2fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.subject-selector-card {
+  justify-content: center;
+  .card-label { font-size: 0.85rem; font-weight: 800; color: var(--agm-text-soft); text-transform: uppercase; margin-bottom: 16px; display: block; letter-spacing: 0.8px;}
+
+  .agm-select-lg {
+    width: 100%; padding: 16px 20px; border: 1px solid var(--agm-border-strong); border-radius: var(--agm-radius-sm);
+    background: var(--agm-surface); color: var(--agm-text); font-size: 1.05rem; font-weight: 700; cursor: pointer; outline: none; transition: 0.2s;
+    &:focus { border-color: var(--agm-primary); box-shadow: 0 0 0 3px var(--agm-primary-soft); }
+  }
+}
+
+.kpi-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+/* ==========================================================================
+   4. GENERADOR DE EXPORTACIONES Y PANEL DE RIESGO
+   ========================================================================== */
+.main-export-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 32px;
+}
+
+/* Toggle PDF/XLSX (Estilo Segmented Control de iOS) */
+.format-toggle {
+  display: flex; background: var(--agm-surface-muted); border-radius: 12px; padding: 6px; border: 1px solid var(--agm-border); width: 100%; max-width: 320px;
+
+  label {
+    flex: 1; text-align: center; padding: 12px 16px; cursor: pointer; border-radius: 8px; font-weight: 800; font-size: 0.9rem; color: var(--agm-text-soft); transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.5px;
+    input { display: none; }
+
+    &.active {
+      background: var(--agm-panel-bg); color: var(--agm-primary);
+      box-shadow: var(--agm-shadow-soft); border: 1px solid var(--agm-border);
+    }
+  }
+}
+
+/* Cajas de Acción de Exportación */
+.export-actions-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+
+  .export-action-box {
+    border: 1px solid var(--agm-border-strong); border-radius: var(--agm-radius-lg); padding: 24px;
+    background: var(--agm-surface);
+    display: flex; flex-direction: column; gap: 16px; transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:hover { border-color: var(--agm-primary); box-shadow: var(--agm-shadow-soft); }
+
+    .box-header {
+      display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+      .format-badge { background: green; color: var(--agm-panel-bg); font-weight: 900; font-size: 0.75rem; padding: 4px 10px; border-radius: 6px; letter-spacing: 1px;}
+      h4 { margin: 0; font-size: 1.15rem; color: var(--agm-text); font-weight: 800; letter-spacing: -0.2px;}
+    }
+
+    .action-btn { margin-top: auto; font-weight: 800; padding: 14px; letter-spacing: 0.3px;}
+  }
+}
+
+/* Panel de Riesgo Académico */
+.risk-panel {
+  display: flex; flex-direction: column;
+
+  .risk-content { padding: 0 32px 32px; flex: 1; display: flex; flex-direction: column; }
+  .risk-list { flex: 1; max-height: 380px; display: flex; flex-direction: column; gap: 8px; margin-top: 24px;}
+
+  .risk-item {
+    display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;
+    background: var(--agm-surface); border: 1px solid var(--agm-border); border-radius: var(--agm-radius-sm);
+
+    .student-info {
+      display: flex; flex-direction: column; gap: 6px;
+      strong { color: var(--agm-text); font-size: 1rem; font-weight: 800;}
+      span { font-family: monospace; font-size: 0.85rem; color: var(--agm-text-soft); }
+    }
+    .score-badge { font-weight: 900; padding: 8px 14px; border-radius: 8px; font-size: 1rem; border: 1px solid transparent; &.danger { background: color-mix(in srgb, var(--agm-danger) 10%, var(--agm-surface)); color: var(--agm-danger); border-color: color-mix(in srgb, var(--agm-danger) 20%, transparent); } }
+  }
+}
+
+/* ==========================================================================
+   5. ESTADÍSTICAS GLOBALES DEL SEMESTRE
+   ========================================================================== */
+.stats-overview {
+  display: flex; flex-direction: column; gap: 24px; margin-top: 16px;
+
+  .section-title {
+    margin: 0; font-size: 1.3rem; color: var(--agm-text); font-weight: 800; padding-bottom: 12px;
+    border-bottom: 2px solid var(--agm-border); display: inline-block; align-self: flex-start; letter-spacing: -0.3px;
+  }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+
+  .stat-card {
+    transition: transform 0.2s;
+    &:hover { transform: translateY(-3px); }
+
+    .stat-title { margin: 0 0 20px 0; font-size: 1.15rem; color: var(--agm-text); font-weight: 800; border-bottom: 1px solid var(--agm-border); padding-bottom: 16px;}
+    .metric-list { display: flex; flex-direction: column; gap: 16px; }
+    .metric-row { display: flex; justify-content: space-between; align-items: center; font-size: 1rem; span { color: var(--agm-text-soft); font-weight: 700; letter-spacing: 0.3px;} strong { color: var(--agm-text); font-weight: 900; font-size: 1.1rem;} }
+  }
+}
+
+/* ==========================================================================
+   6. RESPONSIVIDAD (MOBILE FIRST ADAPTATION)
+   ========================================================================== */
+@media (max-width: 1200px) {
+  .main-export-layout { grid-template-columns: 1fr; }
+  .export-actions-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 980px) {
+  .context-dashboard { grid-template-columns: 1fr; }
+  .reports-dashboard-wrapper { padding: 16px; gap: 24px; }
+  .dashboard-card { .card-header, .card-body, &.pad { padding: 24px; } }
+  .risk-panel .risk-content { padding: 0 24px 24px; }
+}
+
+@media (max-width: 650px) {
+  .export-actions-grid { grid-template-columns: 1fr; gap: 16px;}
+  .format-toggle { max-width: 100%; label { padding: 16px; font-size: 0.95rem; } }
+  .dashboard-card .card-header { flex-direction: column; align-items: stretch; }
+}
