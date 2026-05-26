@@ -3,25 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Explicación de Integración</title>
-    <link rel="stylesheet" href="integration.css">
+    <title>Explicación de Integración y Resiliencia</title>
+    <link rel="stylesheet" href="integration.scss">
 </head>
 <body>
     <div class="container">
-        <h1>Integración de Capas</h1>
-        <p>Este bloque del frontend "existe" listo para mapear flujos asíncronos de datos y estructurar las respuestas del servidor.</p>
+        <h1>Integración de Capas y Gestión de Errores</h1>
+        <p>Este frontend expone la lógica para mapear flujos asíncronos y, además, implementa un manejador de estado para tolerar fallos en el servidor de manera controlada.</p>
         
         <h3>Estructura del Modelo Conceptual:</h3>
-        <pre><code>// Definición teórica del intercambio de datos
-interface ServerResponse {
+        <pre><code>interface ServerResponse {
     status: number;
     payload: any;
     error?: string;
 }</code></pre>
 
         <div class="action-zone">
-            <button id="btn-trigger" class="btn">Simular Evento de Petición</button>
-            <p id="api-output"></p>
+            <button id="btn-trigger" class="btn">Simular Petición API</button>
+            
+            <div id="status-card" class="status-card hidden">
+                <p id="api-output"></p>
+                <button id="btn-retry" class="btn btn-retry hidden">Reintentar Conexión</button>
+            </div>
         </div>
     </div>
     <script src="integration.js" defer></script>
