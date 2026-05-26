@@ -1,0 +1,41 @@
+:root{
+  --bg:#f6fbff;
+  --card:#ffffff;
+  --accent:#0ea5e9;
+  --muted:#6b7280;
+  --radius:12px;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#f8fbff,#eef6ff);color:#0f1724;padding:28px}
+.wrap{max-width:1100px;margin:0 auto}
+.top{ text-align:center;margin-bottom:18px;
+  h1{margin:0;font-size:2rem}
+  .subtitle{color:var(--muted);margin-top:6px}
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:18px;
+  margin-bottom:18px;
+}
+
+.panel{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:0 6px 18px rgba(16,24,40,0.06);
+  h2{margin:0 0 10px;color:var(--accent)}
+  ul{margin:0;padding-left:18px;color:var(--muted)}
+  .muted{color:var(--muted);margin-bottom:8px}
+  pre{background:#0f1724;color:#e6eef8;padding:12px;border-radius:8px;overflow:auto}
+}
+
+.port-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px }
+.port{ background:linear-gradient(180deg,#e6f6ff,#dff3ff); color:#034a6b; padding:8px 12px; border-radius:8px; font-weight:600 }
+
+.code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; font-size:0.9rem }
+.foot{ text-align:center;color:var(--muted) }
+@media (max-width:800px){ .grid{grid-template-columns:1fr} }
