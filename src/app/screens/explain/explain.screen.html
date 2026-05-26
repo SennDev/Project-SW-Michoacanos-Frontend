@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Construcción</title>
+  <link rel="stylesheet" href="./build.scss">
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <h1>Construcción y Contenedores</h1>
+      <p class="subtitle">Tecnologías, puertos y recomendaciones para el entorno de desarrollo.</p>
+    </header>
+
+    <section class="grid">
+      <div class="panel tech">
+        <h2>Tecnologías</h2>
+        <ul>
+          <li><strong>Docker</strong> — Contenerización de servicios</li>
+          <li><strong>Node.js</strong> — Backend y scripts</li>
+          <li><strong>NGINX</strong> — Proxy reverso y static hosting</li>
+          <li><strong>Postgres</strong> — Base de datos relacional</li>
+        </ul>
+      </div>
+
+      <div class="panel ports">
+        <h2>Puertos</h2>
+        <p class="muted">Rango de puertos expuestos para microservicios</p>
+        <div class="port-list">
+          <span class="port">3011</span>
+          <span class="port">3012</span>
+          <span class="port">3013</span>
+          <span class="port">3014</span>
+          <span class="port">3015</span>
+          <span class="port">3016</span>
+          <span class="port">3017</span>
+        </div>
+      </div>
+
+      <div class="panel dockerfile">
+        <h2>Ejemplo Dockerfile</h2>
+        <pre><code class="code">
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY . .
+CMD ["node","dist/index.js"]
+        </code></pre>
+      </div>
+
+      <div class="panel compose">
+        <h2>docker-compose (resumen)</h2>
+        <pre><code class="code">
+version: "3.8"
+services:
+  web:
+    build: .
+    ports:
+      - "3011:3000"
+  api:
+    image: myorg/api:latest
+    ports:
+      - "3012:4000"
+        </code></pre>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <small>Consejo: usar .env para puertos y credenciales; mapear volúmenes en desarrollo.</small>
+    </footer>
+  </main>
+
+  <script src="./build.ts" type="module"></script>
+</body>
+</html>
