@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explicación de Integración</title>
+    <link rel="stylesheet" href="integration.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Integración de Capas</h1>
+        <p>Este bloque del frontend "existe" listo para mapear flujos asíncronos de datos y estructurar las respuestas del servidor.</p>
+        
+        <h3>Estructura del Modelo Conceptual:</h3>
+        <pre><code>// Definición teórica del intercambio de datos
+interface ServerResponse {
+    status: number;
+    payload: any;
+    error?: string;
+}</code></pre>
+
+        <div class="action-zone">
+            <button id="btn-trigger" class="btn">Simular Evento de Petición</button>
+            <p id="api-output"></p>
+        </div>
+    </div>
+    <script src="integration.js" defer></script>
+</body>
+</html>
