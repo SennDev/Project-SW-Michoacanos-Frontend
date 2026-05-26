@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Estados HTTP</title>
+  <link rel="stylesheet" href="./error.scss">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-inner">
+        <h1>Estados HTTP</h1>
+        <p class="lead">Visualiza los códigos más comunes y su significado. Haz clic en una tarjeta para ver detalles y recomendaciones.</p>
+      </div>
+    </header>
+
+    <section class="cards" id="cards">
+      <!-- Cada tarjeta se genera desde HTML para accesibilidad -->
+      <article class="card" data-code="200" tabindex="0" aria-labelledby="h-200">
+        <div class="card-left">
+          <div class="badge success">200</div>
+        </div>
+        <div class="card-right">
+          <h2 id="h-200">OK</h2>
+          <p>La petición se ha procesado correctamente.</p>
+        </div>
+      </article>
+
+      <article class="card" data-code="300" tabindex="0" aria-labelledby="h-300">
+        <div class="card-left">
+          <div class="badge warn">300</div>
+        </div>
+        <div class="card-right">
+          <h2 id="h-300">Redirección</h2>
+          <p>El recurso solicitado se encuentra en otra ubicación.</p>
+        </div>
+      </article>
+
+      <article class="card" data-code="400" tabindex="0" aria-labelledby="h-400">
+        <div class="card-left">
+          <div class="badge danger">400</div>
+        </div>
+        <div class="card-right">
+          <h2 id="h-400">Error del cliente</h2>
+          <p>La solicitud contiene sintaxis incorrecta o no puede ser procesada.</p>
+        </div>
+      </article>
+
+      <article class="card" data-code="500" tabindex="0" aria-labelledby="h-500">
+        <div class="card-left">
+          <div class="badge critical">500</div>
+        </div>
+        <div class="card-right">
+          <h2 id="h-500">Error del servidor</h2>
+          <p>Ocurrió un fallo interno en el servidor al procesar la solicitud.</p>
+        </div>
+      </article>
+    </section>
+
+    <aside class="detail" id="detail" aria-live="polite">
+      <button class="close" id="closeDetail" aria-label="Cerrar detalle">✕</button>
+      <div class="detail-inner" id="detailInner">
+        <h3 id="detailTitle">Selecciona un código</h3>
+        <p id="detailDesc">Haz clic en una tarjeta para ver recomendaciones y acciones sugeridas.</p>
+        <pre class="example" id="detailExample"></pre>
+      </div>
+    </aside>
+
+    <footer class="footer">
+      <small>Guía rápida: 200 OK, 300 Redirección, 400 Cliente, 500 Servidor</small>
+    </footer>
+  </main>
+
+  <script src="./error.ts" type="module"></script>
+</body>
+</html>
