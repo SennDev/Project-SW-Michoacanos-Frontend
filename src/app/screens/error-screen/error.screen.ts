@@ -38,3 +38,22 @@ Content-Type: application/json
   }
 };
 
+function openDetail(code:string){
+  const info = examples[code];
+  detailTitle.textContent = info.title;
+  detailDesc.textContent = info.desc;
+  detailExample.textContent = info.example;
+  detail.classList.add('open');
+}
+
+cards.forEach(card=>{
+  card.addEventListener('click', ()=> openDetail(card.dataset["code"]!));
+  card.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(card.dataset["code"]!); }
+  });
+});
+
+closeBtn.addEventListener('click', ()=> detail.classList.remove('open'));
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') detail.classList.remove('open');
+});
