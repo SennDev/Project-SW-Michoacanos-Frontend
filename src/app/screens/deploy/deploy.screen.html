@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Deploy</title>
+  <link rel="stylesheet" href="./deploy.scss">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Deploy en AWS (EC2) con Docker Compose</h1>
+      <p class="desc">Guía práctica para lanzar una instancia EC2 y desplegar con docker-compose.</p>
+    </header>
+
+    <section class="steps">
+      <div class="step">
+        <h2>1. Crear instancia EC2</h2>
+        <ol>
+          <li>En AWS Console → EC2 → Launch Instance.</li>
+          <li>Elegir AMI (por ejemplo, Amazon Linux 2 o Ubuntu LTS).</li>
+          <li>Tipo de instancia según carga; configurar Security Group (abrir puertos 22, 80, 443 y los 3011-3017 si aplica).</li>
+        </ol>
+      </div>
+
+      <div class="step">
+        <h2>2. Conectar y preparar</h2>
+        <pre class="code">ssh -i "mi-key.pem" ec2-user@ec2-xx-xx-xx.compute.amazonaws.com
+sudo apt update && sudo apt install -y docker.io docker-compose
+sudo usermod -aG docker $USER</pre>
+      </div>
+
+      <div class="step">
+        <h2>3. Subir proyecto y ejecutar</h2>
+        <p>Copiar archivos al servidor (scp o git), luego:</p>
+        <pre class="code">docker-compose up -d --build</pre>
+        <p class="muted">Ver logs: <code>docker-compose logs -f</code></p>
+      </div>
+
+      <div class="step">
+        <h2>4. Buenas prácticas</h2>
+        <ul>
+          <li>Usar <strong>IAM roles</strong> y no claves en el código.</li>
+          <li>Configurar <strong>Health checks</strong> y monitoreo (CloudWatch).</li>
+          <li>Automatizar con pipelines (GitHub Actions / CodePipeline).</li>
+        </ul>
+      </div>
+    </section>
+
+    <aside class="compose-sample">
+      <h3>Ejemplo docker-compose.yml</h3>
+      <pre class="code">
+version: "3.8"
+services:
+  web:
+    build: ./web
+    ports:
+      - "3011:3000"
+    restart: always
+  api:
+    image: myorg/api:latest
+    ports:
+      - "3012:4000"
+    environment:
+      - DATABASE_URL=postgres://user:pass@db:5432/app
+  db:
+    image: postgres:15
+    volumes:
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
+      </pre>
+    </aside>
+
+    <footer class="foot">¿Quieres un script automatizado para crear la instancia y desplegar? Puedo generarlo.</footer>
+  </main>
+
+  <script src="./deploy.ts" type="module"></script>
+</body>
+</html>
