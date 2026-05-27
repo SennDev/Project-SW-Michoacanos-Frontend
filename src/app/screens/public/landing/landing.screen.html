@@ -1,19 +1,26 @@
 <main class="public-page">
   <header class="public-nav">
-    <a routerLink="/" class="row">
+    <a routerLink="/" class="brand-link" aria-label="Ir al inicio">
       <span class="brand-mark">A</span>
-      <span>
+      <span class="brand-text">
         <strong>AGM</strong>
         <small class="muted">Academic Grade Management</small>
       </span>
     </a>
-    <nav class="nav-links" aria-label="Navegacion publica">
-      <a href="#inicio">Inicio</a>
-      <a href="#features">Caracteristicas</a>
-      <a href="#architecture">Arquitectura</a>
-      <a routerLink="/about">Nosotros</a>
-      <a href="#technology">Tecnologias</a>
-      <a class="btn primary small" routerLink="/auth/login">Acceder</a>
+
+    <button class="burger-button" (click)="toggleMenu()" [attr.aria-expanded]="isMenuOpen" aria-label="Alternar menú">
+      <span class="burger-line"></span>
+      <span class="burger-line"></span>
+      <span class="burger-line"></span>
+    </button>
+
+    <nav class="nav-links" [class.active]="isMenuOpen" aria-label="Navegación principal">
+      <a href="#inicio" (click)="scrollTo($event, 'inicio')">Inicio</a>
+      <a href="#features" (click)="scrollTo($event, 'features')">Características</a>
+      <a href="#architecture" (click)="scrollTo($event, 'architecture')">Arquitectura</a>
+      <a routerLink="/about" (click)="isMenuOpen = false">Nosotros</a>
+      <a href="#technology" (click)="scrollTo($event, 'technology')">Tecnologías</a>
+      <a class="btn primary small" routerLink="/auth/login" (click)="isMenuOpen = false">Acceder</a>
     </nav>
   </header>
 

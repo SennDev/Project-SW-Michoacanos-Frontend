@@ -9,6 +9,25 @@ import { RouterLink } from '@angular/router';
   styleUrls: ['./landing.screen.scss']
 })
 export class LandingScreen {
+  // Estado para controlar la visibilidad del menú en dispositivos móviles
+  isMenuOpen = false;
+
+  // Método para alternar el menú
+  toggleMenu(): void {
+    this.isMenuOpen = !this.isMenuOpen;
+  }
+  
+  scrollTo(event: Event, sectionId: string): void {
+    // Evita que el enlace intente cambiar la URL en el navegador
+    event.preventDefault(); 
+    
+    // Busca la sección y hace un scroll suave
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+    
+    // Cierra el menú en caso de estar en un celular
+    this.isMenuOpen = false; 
+  }
+
   readonly features = [
     { title: 'Importaciones academicas', copy: 'Carga PDF, CSV y XLSX para docentes, programacion y alumnos sin duplicar logica en frontend.' },
     { title: 'Calificaciones y ponderaciones', copy: 'Configura pesos, actividades y concentrados desde servicios tipados y protegidos por rol.' },
