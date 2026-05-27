@@ -4,8 +4,8 @@
 :host {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 84px); /* Evita el salto de página y respeta el Navbar */
-  overflow: hidden;
+  min-height: calc(100vh - 84px); /* Evita el salto de página y respeta el Navbar */
+  overflow: visible;
   box-sizing: border-box;
 }
 
