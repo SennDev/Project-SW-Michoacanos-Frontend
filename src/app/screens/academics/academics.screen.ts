@@ -11,7 +11,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { errorMessage } from '../../core/utils/error.util';
 import { AcademicsService } from '../../services/academics.service';
 import { NotificationsService } from '../../services/notifications.service';
-import { PeriodsService } from '../../services/periods.service'; // <-- INTEGRADO PARA EL FILTRO
+import { PeriodsService } from '../../services/periods.service';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FileUploadCardComponent } from '../../shared/components/file-upload-card/file-upload-card.component';
@@ -64,8 +64,11 @@ export class AcademicsScreen implements OnInit {
   readonly isWithdrawing = signal(false);
   readonly lastUpdated = signal<Date | null>(null);
 
-  // --- PAGINACIÓN (10 elementos por página) ---
-  readonly itemsPerPage = 10;
+  // --- PAGINACIÓN DINÁMICA ---
+  readonly teachersPageSize = signal(10);
+  readonly subjectsPageSize = signal(12);
+  readonly studentsPageSize = signal(10); // Reservado por si se ocupa a futuro
+
   readonly teachersPage = signal(1);
   readonly subjectsPage = signal(1);
   readonly studentsPage = signal(1);
@@ -82,15 +85,15 @@ export class AcademicsScreen implements OnInit {
     return period.activo ? 'Vigente' : 'Histórico';
   });
 
-  // Paginadores Computados
-  readonly paginatedTeachers = computed(() => this.paginate(this.teachers(), this.teachersPage()));
-  readonly totalTeachersPages = computed(() => Math.ceil(this.teachers().length / this.itemsPerPage) || 1);
+  // Paginadores Computados actualizados
+  readonly paginatedTeachers = computed(() => this.paginate(this.teachers(), this.teachersPage(), this.teachersPageSize()));
+  readonly totalTeachersPages = computed(() => Math.ceil(this.teachers().length / this.teachersPageSize()) || 1);
 
-  readonly paginatedSubjects = computed(() => this.paginate(this.subjects(), this.subjectsPage()));
-  readonly totalSubjectsPages = computed(() => Math.ceil(this.subjects().length / this.itemsPerPage) || 1);
+  readonly paginatedSubjects = computed(() => this.paginate(this.subjects(), this.subjectsPage(), this.subjectsPageSize()));
+  readonly totalSubjectsPages = computed(() => Math.ceil(this.subjects().length / this.subjectsPageSize()) || 1);
 
-  readonly paginatedStudents = computed(() => this.paginate(this.students(), this.studentsPage()));
-  readonly totalStudentsPages = computed(() => Math.ceil(this.students().length / this.itemsPerPage) || 1);
+  readonly paginatedStudents = computed(() => this.paginate(this.students(), this.studentsPage(), this.studentsPageSize()));
+  readonly totalStudentsPages = computed(() => Math.ceil(this.students().length / this.studentsPageSize()) || 1);
 
   ngOnInit(): void {
     if (this.isAdmin()) this.tab.set('teachers');
@@ -101,21 +104,16 @@ export class AcademicsScreen implements OnInit {
       .subscribe(() => this.fetchEntities(true));
   }
 
-  // --- 1. CARGA INICIAL DE PERIODOS ---
   loadInitialData(): void {
     this.loading.set(true);
     this.periodsService.listPeriods().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (periodsData) => {
-        // Ordenamos los periodos para que el activo salga primero
         const sortedPeriods = periodsData.sort((a, b) => Number(b.activo) - Number(a.activo));
         this.periods.set(sortedPeriods);
-
-        // Autoseleccionamos el periodo activo por defecto
         const activePeriod = sortedPeriods.find(p => p.activo);
         if (activePeriod && !this.selectedPeriodId()) {
           this.selectedPeriodId.set(activePeriod.id);
         }
-
         this.fetchEntities(false);
       },
       error: (err) => {
@@ -125,7 +123,6 @@ export class AcademicsScreen implements OnInit {
     });
   }
 
-  // --- 2. CARGA DE ENTIDADES BASADA EN EL PERIODO SELECCIONADO ---
   fetchEntities(isSilent = false): void {
     if (!isSilent) this.loading.set(true);
     this.error.set(null);
@@ -143,7 +140,6 @@ export class AcademicsScreen implements OnInit {
         this.teachers.set(data.teachers.sort((a, b) => a.nombre.localeCompare(b.nombre)));
         this.subjects.set(data.subjects.sort((a, b) => a.nombre.localeCompare(b.nombre)));
 
-        // Reset de Paginación tras recargar
         this.teachersPage.set(1);
         this.subjectsPage.set(1);
 
@@ -170,7 +166,6 @@ export class AcademicsScreen implements OnInit {
     });
   }
 
-  // --- EVENTO: CAMBIO DE PERIODO ---
   onPeriodChange(periodId: number): void {
     this.selectedPeriodId.set(periodId);
     this.selectedSubjectId.set(null);
@@ -178,10 +173,9 @@ export class AcademicsScreen implements OnInit {
     this.fetchEntities(false);
   }
 
-  // --- EVENTO: SELECCIÓN DE MATERIA ---
   selectSubject(id: number): void {
     this.selectedSubjectId.set(id);
-    this.studentsPage.set(1); // Reset de página de alumnos
+    this.studentsPage.set(1);
     this.loadStudents(id);
   }
 
@@ -199,10 +193,10 @@ export class AcademicsScreen implements OnInit {
       });
   }
 
-  // --- LÓGICA DE PAGINACIÓN ---
-  private paginate<T>(array: T[], page: number): T[] {
-    const startIndex = (page - 1) * this.itemsPerPage;
-    return array.slice(startIndex, startIndex + this.itemsPerPage);
+  // Se actualizó para aceptar el parámetro del límite
+  private paginate<T>(array: T[], page: number, size: number): T[] {
+    const startIndex = (page - 1) * size;
+    return array.slice(startIndex, startIndex + size);
   }
 
   changePage(type: 'teachers' | 'subjects' | 'students', delta: number): void {

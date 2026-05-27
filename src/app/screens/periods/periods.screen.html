@@ -4,7 +4,7 @@
   description="Administra los ciclos escolares, importa la programación y gestiona la tira de materias.">
 
   <div class="header-actions">
-    <button class="btn ghost outline" type="button" (click)="load()">Sincronizar Datos</button>
+    <button class="btn ghost outline" type="button" (click)="load()">Actualizar Datos</button>
   </div>
 </agm-page-header>
 
@@ -55,16 +55,25 @@
       <div class="dashboard-grid admin-layout">
 
         <aside class="setup-column">
+          <article class="dashboard-card" style="margin-bottom: 24px; padding: 20px; border-left: 4px solid var(--agm-info);">
+            <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--agm-text);">Flujo de Importación Académica</h3>
+            <ol style="margin: 0; padding-left: 20px; color: var(--agm-text-soft); font-size: 0.9rem; line-height: 1.5;">
+              <li><strong>Crear y Activar Periodo:</strong> Configura las fechas y establécelo como "Vigente".</li>
+              <li><strong>Importar Catálogo:</strong> Sube la sábana de materias en PDF debajo de este formulario.</li>
+              <li><strong>Ir a Consola Academics:</strong> Importa alumnos a cada materia desde la consola central.</li>
+            </ol>
+          </article>
+
           <article class="dashboard-card form-card">
             <div class="card-header">
               <h3>{{ editingId() ? 'Modificar Periodo' : 'Aperturar Periodo' }}</h3>
               @if (editingId()) { <button class="btn ghost small" (click)="resetForm()">Cancelar</button> }
             </div>
 
-            <form class="form-body" [formGroup]="form" (ngSubmit)="save()" novalidate>
+            <form class="form-body" [formGroup]="form" (ngSubmit)="save()" novalidate style="padding: 0 32px 32px 32px;">
               <div class="field">
                 <label>Nombre del Ciclo</label>
-                <input formControlName="nombre" placeholder="Ej. Otoño 2026" [class.is-invalid]="showControlError('nombre')">
+                <input formControlName="nombre" placeholder="Ej. Primavera 2026" [class.is-invalid]="showControlError('nombre')">
               </div>
 
               <div class="field">
@@ -102,15 +111,14 @@
 
           <article class="dashboard-card import-card" style="margin-top: 24px;">
             <div class="card-header">
-              <h3>Importación de Catálogo</h3>
+              <h3>Importación de Catálogo (PDF)</h3>
             </div>
-            <div class="card-body" style="padding: 24px;">
-              <p class="muted-text" style="margin-bottom: 16px; font-size: 0.9rem; color: var(--agm-text-soft);">Carga la sábana oficial de materias para el Periodo Activo.</p>
+            <div class="card-body" style="padding: 0 32px 32px 32px;">
+              <p class="muted-text" style="margin: 0 0 16px 0; font-size: 0.9rem; color: var(--agm-text-soft);">Asegúrate de tener un periodo activo antes de importar la sábana de materias de la Institución.</p>
               <agm-file-upload-card
                 title="Sábana Académica"
-                hint="Documento PDF oficial de la BUAP."
+                hint="Documento PDF oficial."
                 accept=".pdf"
-                actionLabel="Extraer Materias"
                 [loading]="importing()"
                 (upload)="importSchedule($event)" />
             </div>
@@ -160,7 +168,75 @@
 
     @if (isStudent() || isTeacher()) {
       <div class="user-dashboard-layout">
+        <div class="dashboard-header" style="margin-bottom: 24px; border-bottom: 2px solid var(--agm-border); padding-bottom: 12px;">
+          <div class="title-group">
+            <h2 style="margin: 0 0 8px 0; font-size: 1.8rem; font-weight: 900;">{{ isStudent() ? 'Mi Tira de Materias' : 'Mis Grupos Asignados' }}</h2>
+            <p style="margin: 0; color: var(--agm-text-soft); font-size: 1.05rem;">Asignaturas vinculadas a ti en el periodo {{ activePeriod()?.nombre || 'vigente' }}.</p>
+          </div>
         </div>
+
+        @if (subjects().length) {
+          <div class="subjects-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+            @for (subject of subjects(); track subject.id) {
+
+              <article class="subject-item-card"
+                       style="background: var(--agm-panel-bg); border: 1px solid var(--agm-border-strong); border-radius: var(--agm-radius-lg); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--agm-shadow-soft);"
+                       [style.border-color]="($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'var(--agm-warning)' : ''"
+                       [style.background]="($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'color-mix(in srgb, var(--agm-warning) 5%, var(--agm-panel-bg))' : ''">
+
+                @if ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') {
+                  <div class="pending-ribbon" style="background: var(--agm-warning); color: #000; text-align: center; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; padding: 4px 0;">
+                    Baja en Revisión
+                  </div>
+                }
+
+                <div class="sub-header" style="padding: 20px 24px 0; display: flex; justify-content: space-between; align-items: center;">
+                  <span class="nrc-badge" style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--agm-text-soft); background: var(--agm-surface-muted); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--agm-border);">NRC {{ subject.nrc }}</span>
+                  <span class="status-indicator" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 20px; letter-spacing: 0.5px;"
+                        [style.color]="subject.estado === 'abierta' ? 'var(--agm-success)' : 'var(--agm-warning)'"
+                        [style.background]="subject.estado === 'abierta' ? 'color-mix(in srgb, var(--agm-success) 10%, transparent)' : 'color-mix(in srgb, var(--agm-warning) 15%, transparent)'"
+                        [style.border]="'1px solid ' + (subject.estado === 'abierta' ? 'color-mix(in srgb, var(--agm-success) 20%, transparent)' : 'color-mix(in srgb, var(--agm-warning) 30%, transparent)')">
+                    {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Baja Solicitada' : subject.estado }}
+                  </span>
+                </div>
+
+                <div class="sub-body" style="padding: 16px 24px; display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                  <h4 style="margin: 0; font-size: 1.25rem; color: var(--agm-text); line-height: 1.3; font-weight: 800;">{{ subject.nombre }}</h4>
+                  <p class="teacher-name" style="margin: 0; font-size: 0.95rem; color: var(--agm-text-soft); font-weight: 600;">
+                     {{ isStudent() ? (subject.docente_nombre || 'Docente por asignar') : 'Eres el titular' }}
+                  </p>
+                </div>
+
+                <div class="sub-footer" style="margin-top: auto; padding: 20px 24px; border-top: 1px solid var(--agm-border); display: flex; flex-direction: column; gap: 16px; background: color-mix(in srgb, var(--agm-surface-muted) 30%, transparent);">
+                  <div class="tags" style="display: flex; gap: 8px;">
+                    <span class="info-tag" style="background: var(--agm-surface-muted); color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 700; padding: 4px 10px; border-radius: 6px;">Sec: {{ subject.seccion }}</span>
+                    <span class="info-tag" style="background: var(--agm-surface-muted); color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 700; padding: 4px 10px; border-radius: 6px;">Cred: {{ $any(subject).creditos || 6 }}</span>
+                  </div>
+
+                  @if (isStudent()) {
+                    <button class="btn small block"
+                            [class.danger]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
+                            [class.outline]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
+                            [class.warning]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'"
+                            [disabled]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada' || isWithdrawing()"
+                            (click)="askSubjectWithdrawal(subject)"
+                            style="width: 100%;">
+                      {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Baja Solicitada' : 'Dar de Baja' }}
+                    </button>
+                  }
+                  @if (isTeacher()) {
+                    <button class="btn primary small outline block" style="width: 100%;">Ver Alumnos</button>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state-wrapper" style="padding: 40px; background: var(--agm-surface-muted); border-radius: var(--agm-radius-lg); border: 1px dashed var(--agm-border);">
+            <agm-empty-state title="Tira Vacía" message="No hay materias cargadas o vinculadas a ti en este periodo." />
+          </div>
+        }
+      </div>
     }
   </div>
 }
@@ -174,12 +250,13 @@
   (confirm)="deletePeriod()"
   (cancel)="periodToDelete.set(null)"
 />
+
 <agm-confirmation-modal
   [open]="Boolean(subjectWithdrawal())"
   title="Confirmar Solicitud de Baja"
-  [message]="'¿Deseas solicitar tu baja oficial de la materia ' + (subjectWithdrawal()?.nombre || '') + '? Esta petición será enviada a Administración y no puede deshacerse.'"
-  confirmLabel="Enviar Solicitud"
-  confirmTone="warning"
+  [message]="'¿Deseas solicitar la baja académica (Soft-Delete) de la materia ' + (subjectWithdrawal()?.nombre || '') + '? Esta acción notificará automáticamente a tu Docente mediante correo electrónico.'"
+  confirmLabel="Dar de Baja"
+  confirmTone="danger"
   (confirm)="confirmWithdrawalRequest()"
   (cancel)="subjectWithdrawal.set(null)"
 />
