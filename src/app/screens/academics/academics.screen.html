@@ -4,16 +4,47 @@
   description="Administra el directorio institucional, estructura de materias y listas de inscritos.">
 
   <div class="header-actions">
+    <!-- FILTRO DE PERIODO -->
+    <div class="period-selector-wrapper">
+      <label>Periodo de Trabajo:</label>
+      <select class="period-select" [ngModel]="selectedPeriodId()" (ngModelChange)="onPeriodChange($event)">
+        <option [ngValue]="null" disabled>Cargando periodos...</option>
+        @for (period of periods(); track period.id) {
+          <option [ngValue]="period.id">{{ period.nombre }}</option>
+        }
+      </select>
+      @if (selectedPeriodStatus()) {
+        <span class="status-badge" [class.success]="selectedPeriodStatus() === 'Vigente'">
+          {{ selectedPeriodStatus() }}
+        </span>
+      }
+    </div>
+
     @if (lastUpdated()) {
       <span class="last-updated">Actualizado: {{ lastUpdated() | date:'shortTime' }}</span>
     }
-    <button class="btn ghost outline" type="button" (click)="load()">Actualizar Datos</button>
+    <button class="btn ghost outline" type="button" (click)="fetchEntities()">Sincronizar</button>
   </div>
-
 </agm-page-header>
 
+<!-- GUÍA DE IMPORTACIÓN ESTRICTA (Solo Administradores) -->
+@if (isAdmin()) {
+  <div class="import-guide-banner">
+    <div class="guide-header">
+      <strong>Protocolo de Importación y Carga Inicial</strong>
+      <span>Sigue estrictamente este orden para evitar errores de integridad en la base de datos:</span>
+    </div>
+    <div class="guide-steps">
+      <div class="step"><span>1</span> Selecciona el <strong>Periodo de Trabajo</strong> (Arriba a la derecha).</div>
+      <div class="step"><span>2</span> Importa la nómina en <strong>Directorio Docente</strong>.</div>
+      <div class="step"><span>3</span> Importa la programación en <strong>Catálogo de Materias</strong>.</div>
+      <div class="step"><span>4</span> En <strong>Inscripciones y Grupos</strong>, selecciona una materia e importa sus alumnos.</div>
+    </div>
+  </div>
+}
+
 @if (error()) {
-  <agm-error-state [message]="error() ?? 'Ocurrió un error inesperado'" (retry)="load()" />
+  <agm-error-state [message]="error() ?? 'Ocurrió un error inesperado'" (retry)="fetchEntities()" />
 }
 
 @if (loading()) {
@@ -31,16 +62,18 @@
 
     <div class="console-content">
 
+      <!-- ================= PESTAÑA: DOCENTES ================= -->
       @if (tab() === 'teachers') {
         <section class="admin-grid">
           <div class="import-panel">
             <agm-file-upload-card
-              title="Importar Nómina"
+              title="Paso 2: Importar Nómina"
               hint="Sube el archivo PDF oficial."
               accept=".pdf"
               [loading]="importingTeachers()"
-              (fileSelected)="importTeachers($event)" />
+              (upload)="importTeachers($event)" />
           </div>
+
           <div class="table-panel">
             <div class="table-container">
               <table class="agm-table">
@@ -53,7 +86,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (teacher of teachers(); track teacher.id) {
+                  @for (teacher of paginatedTeachers(); track teacher.id) {
                     <tr>
                       <td><strong>{{ teacher.id }}</strong></td>
                       <td>{{ teacher.nombre }}</td>
@@ -66,34 +99,68 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Controles de Paginación -->
+            @if (teachers().length > itemsPerPage) {
+              <div class="pagination-controls">
+                <button class="btn ghost small" [disabled]="teachersPage() === 1" (click)="changePage('teachers', -1)">Anterior</button>
+                <span>Página {{ teachersPage() }} de {{ totalTeachersPages() }}</span>
+                <button class="btn ghost small" [disabled]="teachersPage() === totalTeachersPages()" (click)="changePage('teachers', 1)">Siguiente</button>
+              </div>
+            }
           </div>
         </section>
       }
 
+      <!-- ================= PESTAÑA: MATERIAS ================= -->
       @if (tab() === 'subjects') {
-        <section class="subjects-grid">
-          @for (subject of subjects(); track subject.id) {
-            <article class="subject-card">
-              <div class="card-header">
-                <strong>NRC: {{ subject.nrc }}</strong>
-                <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+        <section class="admin-grid subjects-admin-layout">
+          <div class="import-panel">
+            <agm-file-upload-card
+              title="Paso 3: Importar Materias"
+              hint="Sube el archivo PDF oficial de programación."
+              accept=".pdf"
+              [loading]="importingSubjects()"
+              (upload)="importSubjects($event)" />
+          </div>
+
+          <div class="subjects-wrapper">
+            <div class="subjects-grid">
+              @for (subject of paginatedSubjects(); track subject.id) {
+                <article class="subject-card">
+                  <div class="card-header">
+                    <strong>NRC: {{ subject.nrc }}</strong>
+                    <span class="status-badge" [class]="subject.estado === 'abierta' ? 'success' : 'neutral'">{{ subject.estado }}</span>
+                  </div>
+                  <h2>{{ subject.nombre }}</h2>
+                  <p>{{ subject.docente_nombre || 'Sin docente asignado' }}</p>
+                  <div class="card-footer">
+                    <small>{{ subject.clave }} | Sec. {{ subject.seccion }}</small>
+                    <small class="period-label">Periodo: <strong>{{ $any(subject).periodo_nombre || $any(subject).id_periodo || 'Activo' }}</strong></small>
+                  </div>
+                </article>
+              } @empty {
+                <agm-empty-state title="Sin materias registradas" message="Importa un periodo académico para comenzar a gestionar." />
+              }
+            </div>
+
+            <!-- Controles de Paginación -->
+            @if (subjects().length > itemsPerPage) {
+              <div class="pagination-controls">
+                <button class="btn ghost small" [disabled]="subjectsPage() === 1" (click)="changePage('subjects', -1)">Anterior</button>
+                <span>Página {{ subjectsPage() }} de {{ totalSubjectsPages() }}</span>
+                <button class="btn ghost small" [disabled]="subjectsPage() === totalSubjectsPages()" (click)="changePage('subjects', 1)">Siguiente</button>
               </div>
-              <h2>{{ subject.nombre }}</h2>
-              <p>{{ subject.docente_nombre || 'Sin docente asignado' }}</p>
-              <div class="card-footer">
-                <small>{{ subject.clave }} | Sec. {{ subject.seccion }}</small>
-                <small>{{ subject.salon || 'Por definir' }}</small>
-              </div>
-            </article>
-          } @empty {
-            <agm-empty-state title="Sin materias registradas" message="Importa un periodo académico desde el módulo correspondiente." />
-          }
+            }
+          </div>
         </section>
       }
 
+      <!-- ================= PESTAÑA: ALUMNOS ================= -->
       @if (tab() === 'students') {
         <section class="master-detail-layout">
 
+          <!-- Columna Izquierda: Grupos -->
           <aside class="sidebar-list">
             <div class="sidebar-header">
               <h4>Grupos Disponibles</h4>
@@ -112,21 +179,26 @@
             </div>
           </aside>
 
+          <!-- Columna Derecha: Alumnos Paginados -->
           <main class="detail-panel">
             @if (selectedSubjectId()) {
               <div class="detail-header">
                 <div class="header-info">
                   <h2>{{ selectedSubject()?.nombre }}</h2>
-                  <p>{{ students().length }} alumnos inscritos.</p>
+                  <p>
+                    <!-- ETIQUETA DE PERIODO CLARA PARA EL ALUMNO -->
+                    <span class="period-label-inline">Periodo: {{ $any(selectedSubject()).periodo_nombre || 'Activo' }}</span>
+                    &bull; {{ students().length }} alumnos inscritos.
+                  </p>
                 </div>
                 @if (isAdmin()) {
                   <agm-file-upload-card
                     compact="true"
-                    title="Cargar Lista"
-                    hint="PDF"
-                    accept=".pdf"
+                    title="Paso 4: Cargar Lista"
+                    hint="PDF/XLSX"
+                    accept=".pdf,.xlsx,.csv"
                     [loading]="importingStudents()"
-                    (fileSelected)="importStudents($event)" />
+                    (upload)="importStudents($event)" />
                 }
               </div>
 
@@ -141,8 +213,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    @for (student of students(); track student.id) {
-                      <tr>
+                    @for (student of paginatedStudents(); track student.id) {
+                      <tr [class.highlight-warning]="student.status === 'baja_solicitada' || $any(student).estado === 'baja_solicitada'">
                         <td><strong>{{ student.matricula }}</strong></td>
                         <td>{{ student.nombre }}</td>
                         <td>{{ student.email }}</td>
@@ -150,12 +222,12 @@
                           <td>
                             <button
                               class="btn small"
-                              [class.danger]="student.status === 'baja_solicitada'"
+                              [class.danger]="student.status === 'baja_solicitada' || $any(student).estado === 'baja_solicitada'"
                               [class.outline]="student.activo === false"
-                              [class.btn-neutral]="student.status !== 'baja_solicitada'"
+                              [class.btn-neutral]="!(student.status === 'baja_solicitada' || $any(student).estado === 'baja_solicitada')"
                               [disabled]="student.activo === false"
                               (click)="reviewWithdrawal(student)">
-                              {{ student.activo === false ? 'Baja procesada' : 'Revisar Baja' }}
+                              {{ student.activo === false ? 'Baja procesada' : (student.status === 'baja_solicitada' || $any(student).estado === 'baja_solicitada') ? 'Aprobar Baja' : 'Regular' }}
                             </button>
                           </td>
                         }
@@ -166,8 +238,18 @@
                   </tbody>
                 </table>
               </div>
+
+              <!-- Controles de Paginación Alumnos -->
+              @if (students().length > itemsPerPage) {
+                <div class="pagination-controls">
+                  <button class="btn ghost small" [disabled]="studentsPage() === 1" (click)="changePage('students', -1)">Anterior</button>
+                  <span>Página {{ studentsPage() }} de {{ totalStudentsPages() }}</span>
+                  <button class="btn ghost small" [disabled]="studentsPage() === totalStudentsPages()" (click)="changePage('students', 1)">Siguiente</button>
+                </div>
+              }
+
             } @else {
-              <agm-empty-state title="Selecciona un grupo" message="Elige una materia del panel izquierdo." />
+              <agm-empty-state title="Selecciona un grupo" message="Elige una materia del panel izquierdo para cargar la lista y realizar el Paso 4." />
             }
           </main>
         </section>

@@ -75,7 +75,7 @@
                 </select>
               </div>
 
-              <div class="form-row">
+              <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="field">
                   <label>Apertura</label>
                   <input type="date" formControlName="fecha_inicio" [class.is-invalid]="showControlError('fecha_inicio') || hasDateRangeError()">
@@ -85,10 +85,14 @@
                   <input type="date" formControlName="fecha_fin" [class.is-invalid]="showControlError('fecha_fin') || hasDateRangeError()">
                 </div>
               </div>
-              @if (hasDateRangeError()) { <span class="field-error text-center">Fechas incongruentes.</span> }
+              @if (hasDateRangeError()) { <span class="field-error text-center" style="color: var(--agm-danger); font-size: 0.85rem;">Fechas incongruentes.</span> }
 
-              <div class="card-footer mt-auto">
-                <p class="muted-text text-sm">Este periodo será el activo por defecto.</p>
+              <div class="field" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 10px; background: var(--agm-surface-muted); padding: 12px; border-radius: 6px; border: 1px solid var(--agm-border);">
+                <input type="checkbox" id="activoToggle" formControlName="activo" style="width: auto; transform: scale(1.2); cursor: pointer; margin: 0;">
+                <label for="activoToggle" style="margin: 0; cursor: pointer; font-weight: 700; font-size: 0.9rem;">Establecer como periodo Vigente</label>
+              </div>
+
+              <div class="card-footer mt-auto" style="margin-top: 24px;">
                 <button class="btn primary block" type="submit" [disabled]="form.invalid || saving()">
                   {{ saving() ? 'Procesando...' : (editingId() ? 'Guardar Cambios' : 'Generar Periodo') }}
                 </button>
@@ -96,12 +100,12 @@
             </form>
           </article>
 
-          <article class="dashboard-card import-card">
+          <article class="dashboard-card import-card" style="margin-top: 24px;">
             <div class="card-header">
               <h3>Importación de Catálogo</h3>
             </div>
-            <div class="card-body">
-              <p class="muted-text">Carga la sábana oficial de materias de la institución.</p>
+            <div class="card-body" style="padding: 24px;">
+              <p class="muted-text" style="margin-bottom: 16px; font-size: 0.9rem; color: var(--agm-text-soft);">Carga la sábana oficial de materias para el Periodo Activo.</p>
               <agm-file-upload-card
                 title="Sábana Académica"
                 hint="Documento PDF oficial de la BUAP."
@@ -129,10 +133,22 @@
               />
 
               <ng-template #periodActions let-period>
-                <div class="table-actions">
+                <div class="table-actions" style="display: flex; gap: 12px; align-items: center; justify-content: flex-end;">
+
+                  @if (period.activo) {
+                    <span style="color: #10b981; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                      <span style="font-size: 1rem; line-height: 1;">●</span> Vigente
+                    </span>
+                  } @else {
+                    <span style="color: #ef4444; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);">
+                      <span style="font-size: 1rem; line-height: 1;">●</span> Histórico
+                    </span>
+                    <button class="btn primary small outline" type="button" [disabled]="saving()" (click)="setActivePeriod(period)">Activar</button>
+                  }
+
                   <button class="btn ghost small" type="button" (click)="edit(period)">Editar</button>
                   <button class="btn danger small outline" type="button" [disabled]="period.activo" (click)="askDelete(period)">
-                    {{ period.activo ? 'Vigente' : 'Borrar' }}
+                    Borrar
                   </button>
                 </div>
               </ng-template>
@@ -144,70 +160,7 @@
 
     @if (isStudent() || isTeacher()) {
       <div class="user-dashboard-layout">
-
-        <div class="dashboard-section-header">
-          <div class="title-group">
-            <h2>{{ isStudent() ? 'Mi Tira de Materias' : 'Mis Grupos Asignados' }}</h2>
-            <p>Listado oficial de asignaturas para el periodo {{ activePeriod()?.nombre || 'vigente' }}.</p>
-          </div>
         </div>
-
-        @if (subjects().length) {
-          <div class="subjects-grid">
-            @for (subject of subjects(); track subject.id) {
-
-              <article class="subject-card" [class.is-pending]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'">
-
-                @if ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') {
-                  <div class="pending-ribbon">Revisión en Proceso</div>
-                }
-
-                <div class="sub-header">
-                  <span class="nrc-badge">NRC {{ subject.nrc }}</span>
-                  <span class="status-badge"
-                        [class.success]="subject.estado === 'abierta'"
-                        [class.warning]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'">
-                    {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Baja Solicitada' : subject.estado }}
-                  </span>
-                </div>
-
-                <div class="sub-body">
-                  <h4 class="subject-title">{{ subject.nombre }}</h4>
-                  <p class="teacher-name">
-                    <span class="icon" aria-hidden="true">👨‍🏫</span>
-                    {{ isStudent() ? (subject.docente_nombre || 'Docente por asignar') : 'Tú eres el titular' }}
-                  </p>
-                </div>
-
-                <div class="sub-footer">
-                  <div class="tags-group">
-                    <span class="tag">Sec: {{ subject.seccion }}</span>
-                    <span class="tag">Cred: {{ $any(subject).creditos || 6 }}</span>
-                  </div>
-
-                  @if (isStudent()) {
-                    <button class="btn action-btn block"
-                            [class.danger]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
-                            [class.outline]="!($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada')"
-                            [class.disabled]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'"
-                            [disabled]="$any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada'"
-                            (click)="askSubjectWithdrawal(subject)">
-                      {{ ($any(subject).status === 'baja_solicitada' || subject.estado === 'baja_solicitada') ? 'Solicitud Enviada' : 'Solicitar Baja' }}
-                    </button>
-                  }
-                  @if (isTeacher()) {
-                    <button class="btn primary small outline block">Ver Alumnos</button>
-                  }
-                </div>
-              </article>
-            }
-          </div>
-        } @else {
-          <div class="empty-state-wrapper">
-            <agm-empty-state title="Tira Vacía" message="No hay materias cargadas o vinculadas a ti en este periodo." />
-          </div>
-        }
-      </div>
     }
   </div>
 }
@@ -221,7 +174,6 @@
   (confirm)="deletePeriod()"
   (cancel)="periodToDelete.set(null)"
 />
-
 <agm-confirmation-modal
   [open]="Boolean(subjectWithdrawal())"
   title="Confirmar Solicitud de Baja"

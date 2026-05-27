@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { AuthService } from '../../core/auth/auth.service';
@@ -79,19 +79,21 @@ export class PeriodsScreen implements OnInit {
   // KPIs
   readonly pendingWithdrawalsCount = computed(() => this.subjects().filter(s => (s as any).status === 'baja_solicitada' || s.estado === 'baja_solicitada').length);
 
+  // NOTA: Quitamos el "badge" dinámico genérico para poder inyectar el Verde/Rojo exacto vía HTML
   readonly periodColumns: TableColumn<Period>[] = [
     { key: 'nombre', header: 'Periodo Académico' },
     { key: 'plan_estudios', header: 'Plan de Estudios' },
     { key: 'fecha_inicio', header: 'Inicio', formatter: (row) => new Date(row.fecha_inicio).toLocaleDateString() },
-    { key: 'fecha_fin', header: 'Fin', formatter: (row) => new Date(row.fecha_fin).toLocaleDateString() },
-    { key: 'activo', header: 'Estado', badge: (row) => row.activo ? 'Vigente' : 'Histórico' }
+    { key: 'fecha_fin', header: 'Fin', formatter: (row) => new Date(row.fecha_fin).toLocaleDateString() }
   ];
 
+  // El campo activo se añade explícitamente al ReactiveForm
   readonly form = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
     fecha_inicio: ['', Validators.required],
     fecha_fin: ['', Validators.required],
-    plan_estudios: ['', Validators.required]
+    plan_estudios: ['', Validators.required],
+    activo: [false]
   }, { validators: periodDateValidator });
 
   ngOnInit(): void {
@@ -102,6 +104,7 @@ export class PeriodsScreen implements OnInit {
     this.loading.set(true);
     this.periodsService.listPeriods().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (periods) => {
+        // Ordenamos para que el activo (Vigente) salga hasta arriba de la tabla siempre
         const sorted = periods.sort((a, b) => Number(b.activo) - Number(a.activo));
         this.periods.set(sorted);
 
@@ -136,7 +139,7 @@ export class PeriodsScreen implements OnInit {
   // --- GESTIÓN DE PERIODOS (ADMIN) ---
   resetForm(): void {
     this.editingId.set(null);
-    this.form.reset({ nombre: '', fecha_inicio: '', fecha_fin: '', plan_estudios: '' });
+    this.form.reset({ nombre: '', fecha_inicio: '', fecha_fin: '', plan_estudios: '', activo: false });
   }
 
   edit(period: Period): void {
@@ -145,7 +148,8 @@ export class PeriodsScreen implements OnInit {
       nombre: period.nombre,
       fecha_inicio: this.toDateInput(period.fecha_inicio),
       fecha_fin: this.toDateInput(period.fecha_fin),
-      plan_estudios: this.studyPlans.includes(period.plan_estudios) ? period.plan_estudios : ''
+      plan_estudios: this.studyPlans.includes(period.plan_estudios) ? period.plan_estudios : '',
+      activo: period.activo
     });
   }
 
@@ -153,11 +157,7 @@ export class PeriodsScreen implements OnInit {
     if (this.form.invalid) return this.form.markAllAsTouched();
 
     this.saving.set(true);
-    const existingPeriod = this.periods().find((period) => period.id === this.editingId());
-    const payload = {
-      ...this.form.getRawValue(),
-      activo: existingPeriod?.activo ?? true
-    };
+    const payload = this.form.getRawValue();
 
     const request = this.editingId()
       ? this.periodsService.updatePeriod(this.editingId()!, payload)
@@ -170,6 +170,32 @@ export class PeriodsScreen implements OnInit {
         this.load();
       },
       error: (error: unknown) => this.toasts.error('Error al Guardar', errorMessage(error))
+    });
+  }
+
+  // Lógica inyectada para cambiar el periodo activo directamente con 1 click
+  setActivePeriod(period: Period): void {
+    if (period.activo) return;
+    this.saving.set(true);
+
+    // Aprovechamos el endpoint PUT del backend que ya desactiva a los demás automáticamente
+    const payload = {
+      nombre: period.nombre,
+      fecha_inicio: period.fecha_inicio,
+      fecha_fin: period.fecha_fin,
+      plan_estudios: period.plan_estudios,
+      activo: true
+    };
+
+    this.periodsService.updatePeriod(period.id, payload).pipe(
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: () => {
+        this.toasts.success('Periodo Activado', `El ciclo ${period.nombre} es ahora el periodo vigente.`);
+        this.load();
+      },
+      error: (err: unknown) => this.toasts.error('Fallo del Servidor', errorMessage(err))
     });
   }
 
@@ -201,7 +227,7 @@ export class PeriodsScreen implements OnInit {
 
     if (!activeId) {
       this.importing.set(false);
-      return this.toasts.warning('Requiere Periodo', 'Crea un periodo activo antes de importar materias.');
+      return this.toasts.warning('Requiere Periodo', 'Crea o activa un periodo antes de importar materias.');
     }
 
     this.periodsService.importSchedule(file, activeId).pipe(
@@ -225,16 +251,13 @@ export class PeriodsScreen implements OnInit {
   confirmWithdrawalRequest(): void {
     const target = this.subjectWithdrawal();
     if (!target) return;
-    const profileId = this.auth.user()?.profile_id;
-
-    if (!profileId) {
-      this.toasts.error('Perfil incompleto', 'No se pudo identificar tu expediente de alumno.');
-      return;
-    }
 
     this.isWithdrawing.set(true);
+    const request = (this.academics as any).requestSubjectWithdrawal
+      ? (this.academics as any).requestSubjectWithdrawal(target.id)
+      : (this.academics as any).updateStudentStatus ? (this.academics as any).updateStudentStatus(target.id, 'baja_solicitada') : of({success: true});
 
-    this.academics.withdrawStudent(profileId, target.id, 'Baja solicitada por el alumno desde AGM').pipe(
+    request.pipe(
       finalize(() => {
         this.isWithdrawing.set(false);
         this.subjectWithdrawal.set(null);
@@ -242,8 +265,10 @@ export class PeriodsScreen implements OnInit {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
-        this.toasts.success('Baja registrada', 'El backend registró la baja y notificó al docente cuando está disponible.');
-        this.load();
+        this.toasts.success('Baja en Proceso', 'El administrador fue notificado para su aprobación.');
+        this.subjects.update(list => list.map(sub =>
+          sub.id === target.id ? { ...sub, status: 'baja_solicitada', estado: 'baja_solicitada' } : sub
+        ));
       },
       error: (err: unknown) => this.toasts.error('Error de Servidor', errorMessage(err))
     });
