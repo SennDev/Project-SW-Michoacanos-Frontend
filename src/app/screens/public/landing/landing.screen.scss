@@ -1,40 +1,44 @@
 .public-nav {
   display: flex;
-  flex-direction: row; /* Fuerza a que sea una fila */
-  flex-wrap: nowrap;   /* PROHÍBE que los elementos salten a la siguiente línea */
-  justify-content: space-between; /* A la izquierda y burger a la derecha */
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
   margin-bottom: 0.5rem;
   border-radius: 2rem;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
-  position: relative; 
+  background: var(--agm-surface-glass);
+  border: 1px solid var(--agm-border);
+  box-shadow: var(--agm-shadow-soft);
+  color: var(--agm-text);
+  position: relative;
+  backdrop-filter: blur(18px);
 }
 
 .brand-link {
   display: flex;
-  flex-direction: row !important; /* Fuerza a que la 'A' y el texto estén uno al lado del otro */
-  flex-wrap: nowrap; /* Evita que el título se caiga a la línea de abajo */
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
-  background-color: #212529;
+  background-color: var(--agm-surface);
+  border: 1px solid var(--agm-border-strong);
   padding: 0.5rem 1.2rem;
   border-radius: 1rem;
-  
-  /* Asegura el texto de la marca blanco en todo momento */
-  color: #ffffff; 
-  
-  &:hover, &:focus {
-    color: #ffffff;
-  }
-
-  .brand-mark, strong, small {
-    color: #ffffff;
-  }
+  color: var(--agm-text);
 }
 
+.brand-link:hover,
+.brand-link:focus {
+  color: var(--agm-text);
+}
+
+.brand-link .brand-mark,
+.brand-link strong,
+.brand-link small {
+  color: var(--agm-text);
+}
 /* Mantiene "AGM" y su subtítulo apilados correctamente */
 .brand-text {
   display: flex;
@@ -98,27 +102,26 @@
   a {
     white-space: nowrap;
     text-decoration: none;
-    color: inherit;
+    color: var(--agm-text);
   }
 
-  /* Breakpoint para móviles */
   @media (max-width: 768px) {
-    display: none; /* Oculta el menú por defecto */
+    display: none;
     flex-direction: column;
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
-    background: rgba(255, 255, 255, 0.98);
+    background: var(--agm-surface);
     padding: 1.5rem;
     border-radius: 1rem;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--agm-border);
+    box-shadow: var(--agm-shadow-soft);
     margin-top: 0.5rem;
     z-index: 9;
 
-    /* Clase activa controlada por Angular */
     &.active {
-      display: flex; 
+      display: flex;
     }
 
     a {
