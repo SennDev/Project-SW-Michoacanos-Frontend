@@ -1,0 +1,73 @@
+<main class="auth-page">
+  <section class="login-shell">
+    <aside class="login-story">
+      <a routerLink="/" class="row brand-row">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AGM</strong>
+          <small>Academic Grade Management</small>
+        </span>
+      </a>
+      <div>
+        <p class="section-kicker">Acceso institucional</p>
+        <h1>Gestion academica clara, segura y conectada.</h1>
+        <p>
+          Ingresa al panel segun tu rol para administrar periodos, registrar asistencias QR,
+          capturar calificaciones y generar reportes.
+        </p>
+      </div>
+      <div class="role-hints" aria-label="Roles disponibles">
+        @for (role of roles; track role.title) {
+          <article>
+            <strong>{{ role.title }}</strong>
+            <span>{{ role.copy }}</span>
+          </article>
+        }
+      </div>
+    </aside>
+
+    <section class="auth-card">
+      <div>
+        <p class="section-kicker">Bienvenido</p>
+        <h2>Iniciar sesion</h2>
+        <p class="login-copy">Usa tus credenciales institucionales para continuar.</p>
+      </div>
+
+      <form class="form-grid login-form" [formGroup]="form" (ngSubmit)="submit()">
+        <div class="field">
+          <label for="email">Correo institucional</label>
+          <input id="email" type="email" autocomplete="email" formControlName="email" placeholder="admin@agm.local">
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <span class="field-error">Ingresa un correo valido.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="password">Contrasena</label>
+          <input id="password" type="password" autocomplete="current-password" formControlName="password" placeholder="Admin123!">
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <span class="field-error">La contrasena debe tener al menos 6 caracteres.</span>
+          }
+        </div>
+
+        <a class="forgot-link" routerLink="/auth/recover">Olvide mi contrasena</a>
+
+        @if (error()) {
+          <div class="login-error" role="alert">{{ error() }}</div>
+        }
+
+        <button class="btn primary" type="submit" [disabled]="form.invalid || loading()">
+          {{ loading() ? 'Entrando...' : 'Iniciar sesion' }}
+        </button>
+
+        <button class="btn ghost" type="button" (click)="fillDevCredentials()">
+          Usar credenciales dev
+        </button>
+      </form>
+
+      <p class="auth-foot">
+        SPA conectada a microservicios REST locales. <a routerLink="/">Volver al inicio</a>
+      </p>
+    </section>
+  </section>
+</main>
