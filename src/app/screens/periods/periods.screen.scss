@@ -89,6 +89,38 @@
   height: 100%;
 }
 
+.dashboard-card.form-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow: visible;
+
+  .card-header {
+    padding: 24px 32px 18px;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--agm-border);
+  }
+
+  .form-body {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 0 32px 32px;
+    flex: 1;
+
+    > .field:first-child {
+      margin-top: 10px;
+    }
+  }
+
+  .card-footer {
+    padding: 20px 0 0;
+    border-top: 1px solid var(--agm-border);
+    background: transparent;
+  }
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -106,6 +138,7 @@
     color: var(--agm-text-soft);
     text-transform: uppercase;
     letter-spacing: 0.8px;
+    margin-bottom: 6px;
   }
 
   input, .agm-select {
@@ -477,6 +510,10 @@
   .dashboard-card.pad,
   .active-period-card {
     padding: 24px;
+  }
+
+  .dashboard-card.form-card .form-body {
+    padding: 0 24px 24px;
   }
 
   .active-period-card .active-details .date-range {
