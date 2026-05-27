@@ -9,6 +9,8 @@ import { RouterLink } from '@angular/router';
   styleUrls: ['./about.screen.scss']
 })
 export class AboutScreen {
+  isMenuOpen = false;
+
   readonly members = [
     { name: 'Fernando', initials: 'F', focus: 'Flujos académicos y validación funcional.' },
     { name: 'Gerson', initials: 'G', focus: 'Frontend, experiencia visual e integración.' },
@@ -23,4 +25,8 @@ export class AboutScreen {
     { title: 'Operación diaria', copy: 'Docentes califican, abren asistencias QR y consultan avances.' },
     { title: 'Evidencia final', copy: 'Reportes PDF/XLSX consolidan calificaciones, asistencias y estadísticas.' }
   ];
+
+  toggleMenu(): void {
+    this.isMenuOpen = !this.isMenuOpen;
+  }
 }

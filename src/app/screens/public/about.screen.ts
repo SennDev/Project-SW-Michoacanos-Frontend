@@ -8,38 +8,45 @@ import { RouterLink } from '@angular/router';
   template: `
     <main class="public-page">
       <header class="public-nav">
-        <a routerLink="/" class="row">
+        <a routerLink="/" class="brand-link" aria-label="Ir al inicio">
           <span class="brand-mark">A</span>
-          <span>
+          <span class="brand-text">
             <strong>AGM</strong>
             <small class="muted">Academic Grade Management</small>
           </span>
         </a>
-        <nav class="nav-links" aria-label="Navegacion publica">
-          <a routerLink="/">Inicio</a>
-          <a routerLink="/" fragment="features">Caracteristicas</a>
-          <a routerLink="/" fragment="architecture">Arquitectura</a>
-          <a routerLink="/about">Nosotros</a>
-          <a routerLink="/" fragment="technology">Tecnologias</a>
-          <a class="btn primary small" routerLink="/auth/login">Acceder</a>
+
+        <button class="burger-button" (click)="toggleMenu()" [attr.aria-expanded]="isMenuOpen" aria-label="Alternar menú">
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+        </button>
+
+        <nav class="nav-links" [class.active]="isMenuOpen" aria-label="Navegación pública">
+          <a routerLink="/" fragment="inicio" (click)="isMenuOpen = false">Inicio</a>
+          <a routerLink="/" fragment="features" (click)="isMenuOpen = false">Características</a>
+          <a routerLink="/" fragment="architecture" (click)="isMenuOpen = false">Arquitectura</a>
+          <a routerLink="/about" (click)="isMenuOpen = false">Nosotros</a>
+          <a routerLink="/" fragment="technology" (click)="isMenuOpen = false">Tecnologías</a>
+          <a class="btn primary small" routerLink="/auth/login" (click)="isMenuOpen = false">Acceder</a>
         </nav>
       </header>
 
       <section class="public-section about-hero">
         <div>
           <p class="section-kicker">Nosotros</p>
-          <h1 class="section-heading">AGM organiza la vida academica con una arquitectura clara y confiable.</h1>
+          <h1 class="section-heading">AGM organiza la vida académica con una arquitectura clara y confiable.</h1>
           <p class="section-copy">
-            El proyecto une procesos cotidianos de administracion escolar con una base tecnica moderna: microservicios,
-            autenticacion por roles, documentos importables, reportes exportables y asistencia QR.
+            El proyecto une procesos cotidianos de administración escolar con una base técnica moderna: microservicios,
+            autenticación por roles, documentos importables, reportes exportables y asistencia QR.
           </p>
         </div>
         <aside class="panel pad mission-panel">
-          <strong>Vision</strong>
-          <p>Convertir tareas dispersas de gestion academica en flujos simples, verificables y seguros para instituciones.</p>
+          <strong>Visión</strong>
+          <p>Convertir tareas dispersas de gestión académica en flujos simples, verificables y seguros para instituciones.</p>
           <div class="divider"></div>
           <strong>Principios</strong>
-          <p>Claridad operativa, trazabilidad, separacion de dominios y una experiencia digna de un sistema institucional.</p>
+          <p>Claridad operativa, trazabilidad, separación de dominios y una experiencia digna de un sistema institucional.</p>
         </aside>
       </section>
 
@@ -47,8 +54,8 @@ import { RouterLink } from '@angular/router';
         <p class="section-kicker">Equipo</p>
         <h2 class="section-heading">Construido por un equipo enfocado en claridad, utilidad y arquitectura.</h2>
         <p class="section-copy">
-          AGM fue desarrollado como una plataforma academica integral, cuidando tanto la experiencia visual como la integracion
-          con microservicios, reportes, seguridad por roles y flujos reales de operacion.
+          AGM fue desarrollado como una plataforma académica integral, cuidando tanto la experiencia visual como la integración
+          con microservicios, reportes, seguridad por roles y flujos reales de operación.
         </p>
         <div class="team-grid">
           @for (member of members; track member.name) {
@@ -66,8 +73,8 @@ import { RouterLink } from '@angular/router';
       <section class="architecture-band">
         <div class="public-section about-grid">
           <article>
-            <p class="section-kicker">Proposito</p>
-            <h2>Menos friccion administrativa, mas visibilidad academica.</h2>
+            <p class="section-kicker">Propósito</p>
+            <h2>Menos fricción administrativa, más visibilidad académica.</h2>
             <p class="section-copy">
               AGM ayuda a importar datos reales, administrar materias, capturar evaluaciones, tomar asistencia y generar evidencia
               sin depender de hojas sueltas o procesos manuales desconectados.
@@ -97,14 +104,14 @@ import { RouterLink } from '@angular/router';
           </article>
           <article class="feature-card">
             <strong>Microservicios REST</strong>
-            <p>El navegador consume REST por puerto mientras el backend conserva comunicacion interna gRPC.</p>
+            <p>El navegador consume REST por puerto mientras el backend conserva comunicación interna gRPC.</p>
           </article>
           <article class="feature-card">
             <strong>Infraestructura local</strong>
             <p>PostgreSQL, Redis, Docker y Nginx completan una base lista para demo y despliegue.</p>
           </article>
         </div>
-        <div class="row wrap mobile-stack" style="margin-top: 28px;">
+        <div class="row wrap mobile-stack" style="margin-top: 28px; display: flex; gap: 16px;">
           <a class="btn accent" routerLink="/auth/login">Acceder a AGM</a>
           <a class="btn ghost" routerLink="/">Volver al inicio</a>
         </div>
@@ -112,6 +119,114 @@ import { RouterLink } from '@angular/router';
     </main>
   `,
   styles: [`
+    /* =========================================
+       Navegación Estilos (Sincronizados)
+    ========================================= */
+    .public-nav {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 2rem;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+      position: relative;
+    }
+
+    .brand-link {
+      display: flex;
+      flex-direction: row !important;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      background-color: #212529;
+      padding: 0.5rem 1.2rem;
+      border-radius: 1rem;
+      color: #ffffff;
+      
+      &:hover, &:focus { color: #ffffff; }
+      .brand-mark, strong, small { color: #ffffff; }
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      line-height: 1.2;
+    }
+
+    .burger-button {
+      display: none;
+      flex-direction: column;
+      justify-content: space-around;
+      width: 30px;
+      height: 24px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      z-index: 10;
+
+      .burger-line {
+        width: 100%;
+        height: 3px;
+        background-color: #333;
+        border-radius: 10px;
+        transition: all 0.3s linear;
+      }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      a {
+        white-space: nowrap;
+        text-decoration: none;
+        color: inherit;
+      }
+      .btn.primary {
+        color: #ffffff !important;
+        &:hover, &:focus { color: #ffffff; }
+      }
+
+      @media (max-width: 768px) {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+        margin-top: 0.5rem;
+        z-index: 9;
+
+        &.active { display: flex; }
+        a {
+          width: 100%;
+          text-align: center;
+          padding: 0.8rem 0;
+          border-bottom: 1px solid rgba(0,0,0,0.05);
+          &:last-child { border-bottom: none; }
+        }
+      }
+    }
+
+    @media (max-width: 768px) {
+      .burger-button { display: flex; }
+      .brand-text { display: none; }
+    }
+
+    /* =========================================
+       Estilos de la Pantalla About
+    ========================================= */
     .about-hero,
     .about-grid {
       display: grid;
@@ -193,7 +308,6 @@ import { RouterLink } from '@angular/router';
       .about-grid {
         grid-template-columns: 1fr;
       }
-
       .team-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -207,6 +321,8 @@ import { RouterLink } from '@angular/router';
   `]
 })
 export class AboutScreen {
+  isMenuOpen = false;
+
   readonly members = [
     { name: 'Fernando', initials: 'F', focus: 'Flujos academicos y validacion funcional.' },
     { name: 'Gerson', initials: 'G', focus: 'Frontend, experiencia visual e integracion.' },
@@ -221,4 +337,8 @@ export class AboutScreen {
     { title: 'Operacion diaria', copy: 'Docentes califican, abren asistencias QR y consultan avances.' },
     { title: 'Evidencia final', copy: 'Reportes PDF/XLSX consolidan calificaciones, asistencias y estadisticas.' }
   ];
+
+  toggleMenu(): void {
+    this.isMenuOpen = !this.isMenuOpen;
+  }
 }

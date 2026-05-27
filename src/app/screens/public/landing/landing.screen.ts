@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, inject, OnInit } from '@angular/core';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'agm-landing-screen',
@@ -8,23 +8,35 @@ import { RouterLink } from '@angular/router';
   templateUrl: './landing.screen.html',
   styleUrls: ['./landing.screen.scss']
 })
-export class LandingScreen {
-  // Estado para controlar la visibilidad del menú en dispositivos móviles
+export class LandingScreen implements OnInit {
+  // Inyección del servicio para leer parámetros de la ruta activa
+  private route = inject(ActivatedRoute);
+
   isMenuOpen = false;
 
-  // Método para alternar el menú
   toggleMenu(): void {
     this.isMenuOpen = !this.isMenuOpen;
   }
-  
+
+  ngOnInit(): void {
+    // Detecta si la página se cargó externamente con un fragmento (ej: /#features)
+    this.route.fragment.subscribe(fragment => {
+      if (fragment) {
+        // El pequeño delay garantiza que Angular terminó de renderizar el HTML
+        setTimeout(() => {
+          const element = document.getElementById(fragment);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      }
+    });
+  }
+
+  // Método para cuando ya estás dentro de la misma landing y haces clic
   scrollTo(event: Event, sectionId: string): void {
-    // Evita que el enlace intente cambiar la URL en el navegador
     event.preventDefault(); 
-    
-    // Busca la sección y hace un scroll suave
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
-    
-    // Cierra el menú en caso de estar en un celular
     this.isMenuOpen = false; 
   }
 
@@ -34,7 +46,7 @@ export class LandingScreen {
     { title: 'Asistencia QR', copy: 'Sesiones temporales, tokens firmados y registro de presente o retardo con retroalimentacion clara.' },
     { title: 'Reportes profesionales', copy: 'Exportaciones PDF y XLSX listas para administracion, docencia y evidencias academicas.' },
     { title: 'RBAC con JWT', copy: 'Navegacion, pantallas y acciones respetan los roles emitidos por ms-auth.' },
-    { title: 'Monitoreo operativo', copy: 'Vista de salud para validar disponibilidad de REST, dependencias y puntos criticos.' }
+    { title: 'Monitoreo operativo', copy: 'Vista de salud para validar disponibilidad de REST, dependences y puntos criticos.' }
   ];
 
   readonly services = [

@@ -1,21 +1,28 @@
 <main class="public-page">
   <header class="public-nav">
-    <a routerLink="/" class="row">
-      <span class="brand-mark">A</span>
-      <span>
-        <strong>AGM</strong>
-        <small class="muted">Academic Grade Management</small>
-      </span>
-    </a>
-    <nav class="nav-links" aria-label="Navegacion publica">
-      <a href="#inicio">Inicio</a>
-      <a href="#features">Caracteristicas</a>
-      <a href="#architecture">Arquitectura</a>
-      <a routerLink="/about">Nosotros</a>
-      <a href="#technology">Tecnologias</a>
-      <a class="btn primary small" routerLink="/auth/login">Acceder</a>
-    </nav>
-  </header>
+  <a routerLink="/" class="brand-link" aria-label="Ir al inicio">
+    <span class="brand-mark">A</span>
+    <span class="brand-text">
+      <strong>AGM</strong>
+      <small class="muted">Academic Grade Management</small>
+    </span>
+  </a>
+
+  <button class="burger-button" (click)="toggleMenu()" [attr.aria-expanded]="isMenuOpen" aria-label="Alternar menú">
+    <span class="burger-line"></span>
+    <span class="burger-line"></span>
+    <span class="burger-line"></span>
+  </button>
+
+  <nav class="nav-links" [class.active]="isMenuOpen" aria-label="Navegación pública">
+    <a routerLink="/" fragment="inicio" (click)="isMenuOpen = false">Inicio</a>
+    <a routerLink="/" fragment="features" (click)="isMenuOpen = false">Características</a>
+    <a routerLink="/" fragment="architecture" (click)="isMenuOpen = false">Arquitectura</a>
+    <a routerLink="/about" (click)="isMenuOpen = false">Nosotros</a>
+    <a routerLink="/" fragment="technology" (click)="isMenuOpen = false">Tecnologías</a>
+    <a class="btn primary small" routerLink="/auth/login" (click)="isMenuOpen = false">Acceder</a>
+  </nav>
+</header>
 
   <section class="public-section about-hero">
     <div>
