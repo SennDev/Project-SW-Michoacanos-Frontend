@@ -1,44 +1,21 @@
-/* ==========================================================================
-   1. ESTRUCTURA BASE MÓVIL CON CONTENEDOR CENTRADO (MOBILE-FIRST)
-   ========================================================================== */
 :host {
   display: flex;
   flex-direction: column;
-  min-height: 100vh; /* Flujo natural en móvil */
-  overflow: visible;
+  min-height: calc(100vh - 84px);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   box-sizing: border-box;
 }
 
-/* Herramientas de la cabecera (fuera del contenedor principal) */
-.header-tools {
-  display: flex;
-  flex-wrap: wrap; 
-  align-items: center;
-  justify-content: center; /* Centramos los botones de la cabecera en móvil */
-  gap: 12px;
-  padding: 10px; /* Espaciado extra en móvil */
-}
+.header-tools { display: flex; align-items: center; gap: 16px; }
 
-/* Píldora de Estado */
+/* Píldora de Estado (Conectado / Sincronizado) */
 .live-status-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--agm-surface-muted, #f8fafc);
-  border: 1px solid var(--agm-border, #e2e8f0);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--agm-text-soft, #64748b);
-
-  .pulse-dot {
-    width: 8px;
-    height: 8px;
-    background-color: var(--agm-success, #10b981);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
+  display: flex; align-items: center; gap: 8px; background: var(--agm-surface-muted, #f8fafc);
+  border: 1px solid var(--agm-border, #e2e8f0); padding: 6px 14px; border-radius: 20px;
+  font-size: 0.85rem; font-weight: 700; color: var(--agm-text-soft, #64748b);
+  .pulse-dot { width: 8px; height: 8px; background-color: var(--agm-success, #10b981); border-radius: 50%; animation: pulse 2s infinite; }
 }
 
 @keyframes pulse {
@@ -47,79 +24,21 @@
   100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* ==========================================================================
-   NUEVO CONTENEDOR CENTRADO RESPONSIVO
-   ==========================================================================
-*/
-.few-dashboard-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding-bottom: 24px;
-  
-  /* --- ESTILOS DE CENTRADO --- */
-  width: 100%;             /* Ocupa todo el ancho disponible */
-  max-width: 500px;        /* Pero restringe el ancho en móviles para legibilidad */
-  margin: 0 auto;          /* CENTRA EL CONTENIDO HORIZONTALMENTE */
-  padding-left: 16px;      /* Espaciado de seguridad lateral */
-  padding-right: 16px;     /* Espaciado de seguridad lateral */
-  box-sizing: border-box;  /* Asegura que el padding no sume al max-width */
-}
-
-.few-dashboard {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  gap: 16px; 
-  min-height: 0;
-}
+.few-dashboard-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-bottom: 24px; }
+.few-dashboard { display: flex; flex-direction: column; flex: 1; gap: 5px; min-height: 0; }
 
 /* ==========================================================================
-   2. BARRA DE FILTROS (CHIPS) - Táctil y adaptada al contenedor
+   2. INTERACTIVIDAD LIGERA: BARRA DE FILTROS (CHIPS)
    ========================================================================== */
 .subject-filter-bar {
-  flex-shrink: 0;
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scrollbar-width: none; 
-  &::-webkit-scrollbar { display: none; }
-
-  /* --- AJUSTE PARA SCROLL EDGE-TO-EDGE --- */
-  /* Permite que los chips se deslicen hasta el borde físico de la pantalla,
-     ignorando el padding del contenedor padre `.few-dashboard-wrapper` */
-  margin-left: -16px; 
-  margin-right: -16px;
-  padding: 4px 16px 10px 16px; /* Restauramos el padding visual internamente */
-
+  flex-shrink: 0; display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 8px 0;
+  scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   .chip {
-    flex-shrink: 0;
-    white-space: nowrap;
-    padding: 8px 18px;
-    border-radius: 24px;
-    border: 1px solid var(--agm-border);
-    background: var(--agm-panel-bg);
-    color: var(--agm-text-soft);
-    font-weight: 700;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-
-    &:hover {
-      border-color: var(--agm-primary);
-      color: var(--agm-primary);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    }
-
-    &.active {
-      background: var(--agm-primary);
-      color: white;
-      border-color: var(--agm-primary);
-      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
-    }
+    flex-shrink: 0; white-space: nowrap; padding: 8px 18px; border-radius: 24px;
+    border: 1px solid var(--agm-border); background: var(--agm-panel-bg); color: var(--agm-text-soft);
+    font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    &:hover { border-color: var(--agm-primary); color: var(--agm-primary); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    &.active { background: var(--agm-primary); color: white; border-color: var(--agm-primary); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
   }
 }
 
@@ -127,425 +46,124 @@
    3. CABECERA HERO Y KPIS PRINCIPALES
    ========================================================================== */
 .dashboard-command {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column; /* Apilado en móvil */
-  gap: 16px;
-  padding: 16px 20px;
-  border: 1px solid color-mix(in srgb, var(--agm-primary) 18%, var(--agm-border));
-  border-radius: var(--agm-radius-lg);
-  color: white;
-  background: linear-gradient(135deg, var(--agm-hero-start), var(--agm-hero-end));
-  box-shadow: var(--agm-shadow);
-
+  flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 20px;
+  align-items: stretch; padding: 20px 24px; border: 1px solid color-mix(in srgb, var(--agm-primary) 18%, var(--agm-border));
+  border-radius: var(--agm-radius-lg); color: white; background: linear-gradient(135deg, var(--agm-hero-start), var(--agm-hero-end)); box-shadow: var(--agm-shadow);
   .command-content { display: flex; flex-direction: column; justify-content: center; }
-  h2 { margin: 6px 0 4px; font-size: clamp(1.4rem, 5vw, 1.8rem); font-weight: 800; line-height: 1.1; }
-  p { margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; line-height: 1.4; }
+  h2 { margin: 6px 0 4px; font-size: clamp(1.5rem, 2vw, 1.8rem); font-weight: 800; line-height: 1.1; }
+  p { margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem; line-height: 1.4; }
 }
 
 .dashboard-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--agm-radius);
-  background: rgba(255, 255, 255, 0.1);
-  strong { font-size: 1rem; }
-  span { color: rgba(255, 255, 255, 0.85); font-size: 0.85rem; font-weight: 700;}
+  display: grid; align-content: center; gap: 4px; padding: 14px; border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--agm-radius); background: rgba(255, 255, 255, 0.1);
+  strong { font-size: 1rem; } span { color: rgba(255, 255, 255, 0.85); font-size: 0.85rem; font-weight: 700;}
 }
 
-/* Tarjetas Indicadoras */
-.signal-strip {
-  flex-shrink: 0;
-  display: grid;
-  gap: 12px;
-  /* Forzamos 2 columnas en móvil e ignoramos el inline style de Angular */
-  grid-template-columns: repeat(2, 1fr) !important; 
-}
+.signal-strip { flex-shrink: 0; display: grid; gap: 16px; }
 
 .metric-tile {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border: 1px solid var(--agm-border);
-  border-radius: var(--agm-radius);
-  background: var(--agm-panel-bg);
-  box-shadow: var(--agm-shadow-soft);
-  border-left: 5px solid var(--tile-tone, var(--agm-primary));
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-
+  display: flex; flex-direction: column; justify-content: space-between; padding: 16px 20px;
+  border: 1px solid var(--agm-border); border-radius: var(--agm-radius); background: var(--agm-panel-bg);
+  box-shadow: var(--agm-shadow-soft); border-left: 6px solid var(--tile-tone, var(--agm-primary)); transition: transform 0.2s ease, box-shadow 0.2s ease;
   &:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.05); }
-
-  span { color: var(--agm-text-soft); font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-  strong { margin: 6px 0; color: var(--agm-text); font-size: clamp(1.6rem, 6vw, 2.6rem); font-weight: 900; line-height: 1; }
-  small { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 600;}
-
-  &.primary { --tile-tone: var(--agm-primary); }
-  &.success { --tile-tone: var(--agm-success); }
-  &.warning { --tile-tone: var(--agm-warning); }
-  &.danger { --tile-tone: var(--agm-danger); }
-  &.neutral { --tile-tone: var(--agm-border-strong); }
+  span { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+  strong { margin: 8px 0; color: var(--agm-text); font-size: clamp(2rem, 3.5vw, 2.6rem); font-weight: 900; line-height: 1; }
+  small { color: var(--agm-text-soft); font-size: 0.9rem; font-weight: 600;}
+  &.primary { --tile-tone: var(--agm-primary); } &.success { --tile-tone: var(--agm-success); }
+  &.warning { --tile-tone: var(--agm-warning); } &.danger { --tile-tone: var(--agm-danger); } &.neutral { --tile-tone: var(--agm-border-strong); }
 }
 
 /* ==========================================================================
-   4. SISTEMA GRID PRINCIPAL (MÓVIL BASE - 1 COLUMNA)
+   4. SISTEMA GRID PRINCIPAL (ELIMINACIÓN DE ESPACIOS VACÍOS)
    ========================================================================== */
 .dashboard-grid {
-  flex: 1;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    "exceptions"
-    "trend"
-    "actions"
-    "focus"
-    "side";
-
-  &.admin-grid {
-    grid-template-areas:
-      "exceptions"
-      "side"
-      "focus"
-      "actions";
-  }
+  flex: 1; display: grid; gap: 5px; min-height: 0;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.25fr) minmax(280px, 1fr);
+  grid-template-areas: "exceptions trend actions" "focus focus side";
+  &.admin-grid { grid-template-columns: 1fr 1fr; grid-template-areas: "exceptions side" "focus actions"; }
 }
 
-.dashboard-card {
-  display: flex;
-  flex-direction: column;
-  min-height: auto; /* Altura natural en móvil */
-  padding: 16px;
-  border: 1px solid var(--agm-border);
-  border-radius: var(--agm-radius);
-  background: var(--agm-panel-bg);
-  box-shadow: var(--agm-shadow-soft);
-}
-
-.exceptions-card { grid-area: exceptions; }
-.trend-card { grid-area: trend; }
-.action-card { grid-area: actions; }
-.focus-card { grid-area: focus; }
-.service-card, .guidance-card { grid-area: side; }
+.dashboard-card { display: flex; flex-direction: column; min-height: 50px; padding: 16px 20px; border: 1px solid var(--agm-border); border-radius: var(--agm-radius); background: var(--agm-panel-bg); box-shadow: var(--agm-shadow-soft); height: 100%; }
+.exceptions-card { grid-area: exceptions; } .trend-card { grid-area: trend; } .action-card { grid-area: actions; }
+.focus-card { grid-area: focus; min-height: 100px; } .service-card, .guidance-card { grid-area: side; }
 
 .section-head {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--agm-surface-muted);
-  padding-bottom: 8px;
-
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  border-bottom: 1px solid var(--agm-surface-muted); padding-bottom: 8px;
   span { color: var(--agm-text-soft); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; }
-  strong { color: var(--agm-text); font-size: 1.15rem; font-weight: 800; line-height: 1; }
+  strong { color: var(--agm-text); font-size: 1.25rem; font-weight: 800; line-height: 1; }
 }
 
 .card-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-
-  &.scrollable { overflow-y: auto; padding-right: 4px; }
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+  &.scrollable { overflow-y: auto; padding-right: 6px; }
+  &.scrollable:has(.exception-row:only-child) { overflow-y: visible; }
   &.center-flex { justify-content: center; align-items: center; margin: auto 0; }
-  &.flex-col-between { justify-content: space-between; gap: 16px; }
+  &.flex-col-between { justify-content: space-between; }
 }
 
 /* ==========================================================================
    5. ELEMENTOS UI INTERNOS
    ========================================================================== */
 .exception-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 0;
-  border-bottom: 1px dashed var(--agm-border);
-
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px dashed var(--agm-border);
   &:last-child { border-bottom: none; }
   .status-badge { align-self: flex-start; }
   p { margin: 0; color: var(--agm-text); font-size: 0.95rem; line-height: 1.4; }
 }
 
-.pie-container {
-  display: flex;
-  flex-direction: column; /* Pastel y leyenda apilados en móvil */
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  gap: 20px;
-  padding: 10px 0;
-}
-
-.pie-chart {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08);
-  flex-shrink: 0;
-}
-
-.pie-legend {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-
-  li { display: flex; align-items: center; gap: 10px; }
-  .legend-color { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .legend-text { font-size: 1rem; color: var(--agm-text); font-weight: 700; }
-}
+.pie-container { display: flex; align-items: center; justify-content: center; width: 100%; gap: 32px; padding: 20px 0; }
+.pie-chart { width: 100px; height: 100px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08); flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); &:hover { transform: scale(1.05); } }
+.pie-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; li { display: flex; align-items: center; gap: 10px; } .legend-color { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .legend-text { font-size: 1.05rem; color: var(--agm-text); font-weight: 700; } }
 
 .quick-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-
-  a {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 12px;
-    border: 1px solid var(--agm-border);
-    border-radius: var(--agm-radius-sm);
-    background: var(--agm-surface-muted);
-    text-decoration: none;
-    transition: all 0.2s ease;
-
-    &:hover { transform: translateX(4px); border-color: var(--agm-primary); background: white; }
-
-    .action-code {
-      flex-shrink: 0;
-      width: 40px;
-      height: 40px;
-      display: grid;
-      place-items: center;
-      border-radius: var(--agm-radius-sm);
-      color: white;
-      background: var(--agm-primary);
-      font-weight: 800;
-      font-size: 1.1rem;
-    }
-
-    .action-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      strong { color: var(--agm-text); font-size: 1rem; font-weight: 800; }
-      span { color: var(--agm-text-soft); font-size: 0.85rem; line-height: 1.2; }
-    }
+  display: flex; flex-direction: column; gap: 12px; width: 100%; max-height: 100%; overflow-y: auto; padding-right: 4px;
+  a { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--agm-border); border-radius: var(--agm-radius-sm); background: var(--agm-surface-muted); text-decoration: none; transition: all 0.2s ease; min-height: 20px; flex-shrink: 0;
+    &:hover { transform: translateX(4px); border-color: var(--agm-primary); box-shadow: 0 4px 8px rgba(0,0,0,0.05); background: white; }
+    .action-code { flex-shrink: 0; width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--agm-radius-sm); color: white; background: var(--agm-primary); font-weight: 800; font-size: 1.2rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+    .action-text { display: flex; flex-direction: column; gap: 2px; strong { color: var(--agm-text); font-size: 1.05rem; font-weight: 800; } span { color: var(--agm-text-soft); font-size: 0.9rem; line-height: 1.2; } }
   }
-
-  a.success .action-code { background: var(--agm-success); }
-  a.warning .action-code { background: var(--agm-warning); }
-  a.info .action-code { background: var(--agm-info); }
+  a.success .action-code { background: var(--agm-success); } a.warning .action-code { background: var(--agm-warning); } a.info .action-code { background: var(--agm-info); }
 }
 
-/* Listas Secundarias en Móvil (1 columna) */
-.focus-list, .service-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-.focus-item, .service-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid var(--agm-border);
-  border-radius: var(--agm-radius-sm);
-  background: var(--agm-surface-muted);
-
-  strong { color: var(--agm-text); font-size: 0.95rem; font-weight: 700; }
-  span { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 500; }
-}
-
-.service-item {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  span:first-child { font-weight: 700; color: var(--agm-text); font-size: 0.95rem; }
-}
+.focus-list, .service-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.service-list { grid-template-columns: 1fr; }
+.focus-item, .service-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--agm-border); border-radius: var(--agm-radius-sm); background: var(--agm-surface-muted); strong { color: var(--agm-text); font-size: 1rem; font-weight: 700; } span { color: var(--agm-text-soft); font-size: 0.85rem; font-weight: 500; } }
+.service-item { flex-direction: row; justify-content: space-between; align-items: center; span:first-child { font-weight: 700; color: var(--agm-text); font-size: 1rem; } }
+.guidance-card p { color: var(--agm-text); font-size: 1rem; line-height: 1.5; margin: 0 0 16px 0; }
 
 /* ==========================================================================
-   6. PROGRESSIVE ENHANCEMENT (MEJORA PROGRESIVA)
+   6. RESPONSIVIDAD (SOLO AFECTA A PANTALLAS PEQUEÑAS)
    ========================================================================== */
-
-/* TABLETS (A partir de 768px) */
-@media (min-width: 768px) {
-  /* --- AMPLIAMOS EL CONTENEDOR CENTRADO --- */
-  .few-dashboard-wrapper {
-    max-width: 960px; /* Ancho cómodo para tablets */
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-
-  .subject-filter-bar {
-    justify-content: center; /* Centramos los chips si caben en la pantalla */
-    margin-left: 0;
-    margin-right: 0;
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .header-tools {
-    justify-content: flex-end; /* Alineamos herramientas a la derecha en pantallas grandes */
-    padding: 0;
-  }
-
-  .dashboard-command {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
-    align-items: stretch;
-  }
-
-  .signal-strip {
-    /* Devolvemos el control al [style.grid-template-columns] de Angular */
-    grid-template-columns: revert !important; 
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas: 
-      "exceptions trend" 
-      "focus actions" 
-      "side side";
-
-    &.admin-grid {
-      grid-template-columns: 1fr 1fr;
-      grid-template-areas: 
-        "exceptions side" 
-        "focus actions";
-    }
-  }
-
-  .pie-container {
-    flex-direction: row; /* Pastel a la izquierda, leyenda a la derecha */
-    gap: 32px;
-  }
-
-  .focus-list {
-    grid-template-columns: repeat(2, 1fr);
-  }
+@media (max-width: 1300px) {
+  .dashboard-grid { grid-template-columns: 1fr 1fr; grid-template-areas: "exceptions trend" "focus actions" "side side"; }
+  .dashboard-grid.admin-grid { grid-template-columns: 1fr; grid-template-areas: "exceptions" "side" "focus" "actions"; }
+  :host { height: auto; overflow-y: visible; }
 }
 
-/* DESKTOPS GRANDES (A partir de 1200px) */
-@media (min-width: 1200px) {
-  :host {
-    /* Retomamos la altura garantizada para Zero-Scroll */
-    min-height: calc(100vh - 84px);
+@media (max-width: 850px) {
+  /* Diseño Estructural Móvil */
+  .signal-strip { grid-template-columns: 1fr 1fr !important; }
+  .dashboard-grid { grid-template-columns: 1fr; grid-template-areas: "exceptions" "trend" "actions" "focus" "side"; }
+  .focus-list { grid-template-columns: 1fr; }
+  .dashboard-command { grid-template-columns: 1fr; }
+  .pie-container { flex-direction: column; gap: 16px; }
+
+  /* Blindaje contra datos dinámicos que estiran la pantalla */
+  .dashboard-grid, .dashboard-card, .card-body, .focus-list, .service-list, .quick-actions, .pie-legend { min-width: 0; }
+  .focus-item, .service-item, .exception-row, .quick-actions a { min-width: 0; width: 100%; box-sizing: border-box; }
+  .exception-row p, .legend-text, .action-text strong, .action-text span, .focus-item strong, .focus-item span, .guidance-text {
+    overflow-wrap: break-word; word-break: break-word; white-space: normal;
   }
+  .metric-tile strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .service-item span:first-child { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
 
-  /* --- AMPLIAMOS EL CONTENEDOR AL MÁXIMO --- */
-  .few-dashboard-wrapper {
-    max-width: 1440px; /* Ancho máximo para monitores grandes */
+  /* Contención forzada para agm-page-header y sus botones */
+  ::ng-deep agm-page-header { display: block; width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; }
+  ::ng-deep agm-page-header .header-tools { flex-wrap: wrap !important; width: 100%; margin-top: 10px; }
+  ::ng-deep agm-page-header .header-tools .btn { flex: 1 1 auto; text-align: center; white-space: normal; }
+  ::ng-deep agm-page-header h1, ::ng-deep agm-page-header h2, ::ng-deep agm-page-header .title-class {
+    overflow-wrap: break-word !important; word-break: break-word !important; white-space: normal !important;
   }
-
-  .few-dashboard {
-    gap: 5px; /* Compresión de espacios para vista gerencial */
-  }
-
-  .dashboard-grid {
-  /* ... tus estilos existentes ... */
-  min-width: 0; 
-}
-
-.dashboard-card {
-  /* ... tus estilos existentes ... */
-  min-width: 0; /* Vital: rompe la restricción de tamaño del hijo flex */
-  overflow: hidden; /* Evita que el contenido interno sobresalga de la tarjeta */
-}
-
-/* 2. Forzar a los textos largos a saltar de línea */
-.card-body p, 
-.exception-row p,
-.focus-item span,
-.guidance-text {
-  overflow-wrap: break-word; /* Obliga a partir palabras gigantes */
-  word-break: break-word;
-  white-space: normal;
-  min-width: 0;
-}
-
-/* 3. Asegurar que los botones de materias (chips) no estiren la barra */
-.subject-filter-bar {
-  /* ... estilos existentes ... */
-  max-width: 100%;
-}
-
-/* 4. Si los indicadores principales cargan números muy grandes */
-.metric-tile {
-  /* ... estilos existentes ... */
-  min-width: 0; 
-  
-  strong {
-    /* ... estilos existentes ... */
-    overflow: hidden;
-    text-overflow: ellipsis; /* Si el número no cabe, pondrá "..." en vez de desbordar */
-    white-space: nowrap;
-  }
-}
-}
-
-.dashboard-grid, 
-.dashboard-card, 
-.card-body, 
-.focus-list, 
-.service-list, 
-.quick-actions, 
-.pie-legend {
-  min-width: 0 !important;
-  max-width: 100%;
-}
-
-/* 2. Flexbox suele resistirse a encoger elementos hijos, le quitamos esa libertad */
-.focus-item, 
-.service-item, 
-.exception-row, 
-.quick-actions a {
-  min-width: 0; 
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* 3. Rompemos a la fuerza cualquier texto largo en las descripciones o excepciones */
-.exception-row p,
-.legend-text,
-.action-text strong,
-.action-text span,
-.focus-item strong,
-.focus-item span,
-.guidance-text {
-  overflow-wrap: break-word !important;
-  word-break: break-word !important;
-  white-space: normal !important;
-  min-width: 0;
-}
-
-/* 4. Tira de métricas (KPIs): Si llega un número gigante, lo truncamos */
-.metric-tile {
-  min-width: 0;
-  
-  strong {
-    overflow: hidden;
-    text-overflow: ellipsis; 
-    white-space: nowrap; /* Mantiene el número en 1 línea pero pone "..." si no cabe */
-    max-width: 100%;
-  }
-}
-
-/* 5. Nodos de Producción: Los nombres de los servicios suelen romper el layout */
-.service-item span:first-child {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis; /* Un nodo largo se verá como "ms-academics-..." */
-  white-space: nowrap !important;
-  min-width: 0;
-  padding-right: 8px; /* Espacio para que no choque con el badge de VIVO/CAÍDO */
 }
