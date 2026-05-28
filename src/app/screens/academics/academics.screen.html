@@ -240,7 +240,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    @for (student of students(); track student.id) {
+                    @for (student of paginatedStudents(); track student.id) {
                       <tr [class.highlight-warning]="student.status === 'baja_solicitada' || $any(student).estado === 'baja_solicitada'">
                         <td><strong>{{ student.matricula }}</strong></td>
                         <td>{{ student.nombre }}</td>
@@ -265,6 +265,26 @@
                   </tbody>
                 </table>
               </div>
+
+              @if (students().length > 0) {
+                <div class="pagination-controls symmetrical">
+                  <div class="page-size-selector">
+                    <label>Mostrar:</label>
+                    <select class="size-select" [ngModel]="studentsPageSize()" (ngModelChange)="studentsPageSize.set($event); studentsPage.set(1)">
+                      <option [ngValue]="10">10</option>
+                      <option [ngValue]="20">20</option>
+                      <option [ngValue]="30">30</option>
+                      <option [ngValue]="50">50</option>
+                    </select>
+                    <span class="muted-text">Total: {{ students().length }} alumnos</span>
+                  </div>
+                  <div class="page-buttons">
+                    <button class="btn ghost small" [disabled]="studentsPage() === 1" (click)="changePage('students', -1)">Anterior</button>
+                    <span>Página {{ studentsPage() }} de {{ totalStudentsPages() }}</span>
+                    <button class="btn ghost small" [disabled]="studentsPage() === totalStudentsPages()" (click)="changePage('students', 1)">Siguiente</button>
+                  </div>
+                </div>
+              }
             } @else {
               <agm-empty-state title="Selecciona un grupo" message="Elige una materia del panel izquierdo para visualizar la lista de alumnos." />
             }
