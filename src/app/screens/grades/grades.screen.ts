@@ -364,8 +364,28 @@ export class GradesScreen implements OnInit, OnDestroy {
   }
 
   updateGradeDraft(studentId: number, value: string): void {
-    const parsed = value === '' ? null : Number(value);
-    this.draftScores.update((drafts) => ({ ...drafts, [studentId]: Number.isNaN(parsed) ? null : parsed }));
+    let parsed = value === '' ? null : Number(value);
+    const maxPoints = this.selectedActivity()?.max_puntos || 100;
+
+    if (parsed !== null && !Number.isNaN(parsed)) {
+      // Validar límite superior
+      if (parsed > maxPoints) {
+        this.toasts.warning(
+          'Límite excedido', 
+          `El puntaje máximo para esta actividad es de ${maxPoints} puntos.`
+        );
+        parsed = maxPoints; // Auto-ajusta al límite máximo
+      } 
+      // Validar límite inferior (no números negativos)
+      else if (parsed < 0) {
+        parsed = 0;
+      }
+    }
+
+    this.draftScores.update((drafts) => ({ 
+      ...drafts, 
+      [studentId]: Number.isNaN(parsed as number) ? null : parsed 
+    }));
   }
 
   captureAverage(): string {
