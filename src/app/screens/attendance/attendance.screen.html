@@ -1,7 +1,7 @@
 <agm-page-header
   eyebrow="Control de Asistencias"
   title="Pase de Lista Académico"
-  description="Gestión de asistencia mediante lectura de códigos QR e ingreso de tokens.">
+  description="Gestión de asistencia mediante sesiones activas, códigos QR y tokens dinámicos.">
 
   <div class="header-actions" style="display: flex; align-items: center; gap: 16px;">
     @if (lastSyncedAt()) {
@@ -9,168 +9,351 @@
         Última actualización: {{ lastSyncedAt() | date:'shortTime' }}
       </span>
     }
-    <button class="btn ghost outline" type="button" (click)="reload()">Actualizar Datos</button>
+    <button
+      class="btn ghost outline"
+      type="button"
+      [disabled]="loading()"
+      (click)="reload()">
+      Actualizar Datos
+    </button>
   </div>
-
 </agm-page-header>
 
+<!-- =========================================================================
+     SKELETON
+     ========================================================================= -->
 @if (loading()) {
   <agm-loading-skeleton [rows]="6" />
 } @else {
+
   <div class="attendance-wrapper">
 
+    <!-- =====================================================================
+         FILTROS: PERIODO + MATERIA
+         ===================================================================== -->
     <div class="subject-selector-panel">
-      <label for="subjectSelect">Materia en curso:</label>
-      <select id="subjectSelect" class="agm-select" [ngModel]="selectedSubjectId()" (ngModelChange)="selectSubject($event)">
-        <option [ngValue]="null" disabled>Selecciona una materia...</option>
-        @for (sub of subjects(); track sub.id) {
-          <option [ngValue]="sub.id">{{ sub.nombre }} ({{ sub.nrc }})</option>
+      <label for="periodSelect">Periodo de trabajo:</label>
+      <select
+        id="periodSelect"
+        class="agm-select"
+        [ngModel]="selectedPeriodId()"
+        (ngModelChange)="onPeriodChange($event)">
+        <option [ngValue]="null" disabled>Selecciona un periodo…</option>
+        @for (period of periods(); track period.id) {
+          <option [ngValue]="period.id">#{{ period.id }} – {{ period.nombre }}</option>
+        }
+      </select>
+
+      <label for="subjectSelect">Materia del periodo:</label>
+      <select
+        id="subjectSelect"
+        class="agm-select"
+        [disabled]="loadingSubjects() || !selectedPeriodId()"
+        [ngModel]="selectedSubjectId()"
+        (ngModelChange)="selectSubject($event)">
+        <option [ngValue]="null" disabled>
+          {{ loadingSubjects() ? 'Cargando materias…' : 'Selecciona una materia…' }}
+        </option>
+        @for (subject of subjects(); track subject.id) {
+          <option [ngValue]="subject.id">{{ subject.nombre }} ({{ subject.nrc }})</option>
         }
       </select>
     </div>
 
+    <!-- =====================================================================
+         LAYOUT PRINCIPAL (visible sólo cuando hay materia seleccionada)
+         ===================================================================== -->
     @if (selectedSubjectId()) {
       <div class="attendance-layout">
 
+        <!-- =================================================================
+             ASIDE – PANEL OPERATIVO
+             ================================================================= -->
         <aside class="ops-panel">
 
+          <!-- ---------------------------------------------------------------
+               VISTA DOCENTE / ADMIN
+               --------------------------------------------------------------- -->
           @if (isTeacher()) {
             <article class="ops-card">
               <h2 class="panel-title">Operativa Docente</h2>
 
+              <!-- Sesión inactiva -->
               @if (!activeSession()) {
                 <div class="idle-message">
-                  <p>Inicia el pase de lista para obtener el ID de la sesión y compartirlo con tus alumnos.</p>
-                  <button class="btn primary block" type="button" [disabled]="starting()" (click)="startSession()">
-                    {{ starting() ? 'Iniciando...' : 'Abrir Pase de Lista' }}
+                  <p>
+                    Abre el pase de lista para activar la sesión de 10 minutos
+                    y comparte el ID con tus alumnos.
+                  </p>
+                  <button
+                    class="btn primary block"
+                    type="button"
+                    [disabled]="starting()"
+                    (click)="requestStartSession()">
+                    {{ starting() ? 'Iniciando…' : 'Abrir Pase de Lista' }}
                   </button>
                 </div>
+
+              <!-- Sesión activa -->
               } @else {
+                <!-- Info de la sesión + contador persistente -->
                 <div class="active-session-info">
                   <div class="info-group">
-                    <span class="status-badge success">Sesión #{{ activeSession()?.session_id || activeSession()?.id }}</span>
+                    <span class="status-badge success">
+                      Sesión #{{ activeSession()?.session_id }}
+                    </span>
                     <small class="session-date">{{ activeSessionDateLabel() }}</small>
                   </div>
                   <strong class="timer-countdown">{{ timeLeftLabel() }}</strong>
                 </div>
 
+                <!-- Escáner QR (cámara en vivo con requestAnimationFrame + jsQR) -->
                 <div class="scanner-section">
                   <div class="scanner-controls">
-                    <button class="btn block outline" (click)="scannerActive() ? stopScanner() : startScanner()">
-                      {{ scannerActive() ? 'Detener Lector QR' : scannerStarting() ? 'Abriendo cámara...' : 'Activar Lector QR' }}
+                    <button
+                      class="btn block outline"
+                      type="button"
+                      [disabled]="scannerStarting()"
+                      (click)="scannerActive() ? stopScanner() : startScanner()">
+                      {{ scannerActive()
+                          ? 'Detener Lector QR'
+                          : scannerStarting()
+                            ? 'Abriendo cámara…'
+                            : 'Activar Lector QR' }}
                     </button>
                   </div>
 
                   @if (scannerVisible()) {
                     <div class="scanner-frame">
-                      <video #scannerVideo autoplay playsinline></video>
+                      <video #videoElement autoplay playsinline muted></video>
                       <div class="scan-target"></div>
                     </div>
                   }
+                  <!-- Canvas oculto usado por jsQR y por el fallback de imagen -->
+                  <canvas #canvasElement hidden></canvas>
+
                   @if (scannerMessage()) {
-                    <p class="status-text" [class.danger-text]="scannerError()">{{ scannerMessage() }}</p>
+                    <p
+                      class="status-text"
+                      [class.danger-text]="scannerError()">
+                      {{ scannerMessage() }}
+                    </p>
                   }
                 </div>
 
+                <!-- Fallback: subir foto del QR -->
                 <div class="manual-section">
-                  <label>Token detectado / Manual:</label>
+                  <label for="qrPhotoInput">Foto del QR (fallback sin cámara):</label>
+                  <input
+                    id="qrPhotoInput"
+                    type="file"
+                    accept="image/*"
+                    (change)="onQrImageSelected($event)">
+                </div>
+
+                <!-- Input manual de token -->
+                <div class="manual-section">
+                  <label for="manualTokenInput">Token detectado / manual:</label>
                   <div class="input-group">
-                    <input type="text" [(ngModel)]="qrToken" placeholder="Ejem: TKN-A1B2C3" (keyup.enter)="registerAttendance()">
-                    <button class="btn primary" [disabled]="registering() || !qrToken.trim()" (click)="registerAttendance()">
-                      {{ registering() ? '...' : 'Confirmar' }}
+                    <input
+                      id="manualTokenInput"
+                      type="text"
+                      [(ngModel)]="qrToken"
+                      placeholder="Pega o escribe el token"
+                      autocomplete="off"
+                      spellcheck="false"
+                      (keyup.enter)="registerAttendance()">
+                    <button
+                      class="btn primary"
+                      type="button"
+                      [disabled]="registering() || !qrToken.trim()"
+                      (click)="registerAttendance()">
+                      {{ registering() ? '…' : 'Confirmar' }}
                     </button>
                   </div>
                 </div>
 
-                <button class="btn danger block outline" style="margin-top: 20px;" (click)="closeSession()">Cerrar Pase de Lista</button>
+                <!-- Cerrar sesión -->
+                <button
+                  class="btn danger block outline"
+                  type="button"
+                  style="margin-top: 20px;"
+                  [disabled]="closing()"
+                  (click)="requestCloseSession()">
+                  {{ closing() ? 'Cerrando…' : 'Cerrar Sesión' }}
+                </button>
               }
             </article>
           }
 
+          <!-- ---------------------------------------------------------------
+               VISTA ALUMNO
+               El alumno NO ve el roster de clase. Sólo su panel QR y su
+               historial personal.
+               --------------------------------------------------------------- -->
           @if (isStudent()) {
             <article class="ops-card qr-card">
-              <h2 class="panel-title">Generar Mi Asistencia</h2>
+              <h2 class="panel-title">Mi Código de Asistencia</h2>
 
+              <!-- Ingreso del ID de sesión -->
               <div class="session-input-wrapper">
-                <label>ID de Sesión (Dictado por el docente):</label>
+                <label for="studentSessionInput">ID de sesión (lo da el docente):</label>
                 <div class="input-group">
-                  <input type="number" [(ngModel)]="studentSessionId" placeholder="Ej. 1024">
-                  <button class="btn primary" [disabled]="generatingQr() || !studentSessionId" (click)="generateQr()">
-                    {{ generatingQr() ? '...' : 'Generar' }}
+                  <input
+                    id="studentSessionInput"
+                    type="number"
+                    min="1"
+                    [(ngModel)]="studentSessionId"
+                    placeholder="Ej. 1024"
+                    (keyup.enter)="connectStudentSession()">
+                  <button
+                    class="btn primary"
+                    type="button"
+                    [disabled]="generatingQr() || !studentSessionId"
+                    (click)="connectStudentSession()">
+                    {{ generatingQr() ? 'Conectando…' : 'Conectar' }}
                   </button>
                 </div>
               </div>
 
+              <!-- QR dinámico + token rotativo (15 s) -->
               @if (qrPayload()) {
                 <div class="qr-display-box" style="margin-top: 24px;">
-                  <img class="qr-image" [src]="'data:image/png;base64,' + qrPayload()?.qr_png_base64" alt="QR de asistencia">
-                  <span class="timer-badge">Auto-actualiza en {{ qrTimeLeft() }}s</span>
+                  <img
+                    class="qr-image"
+                    [src]="'data:image/png;base64,' + qrPayload()?.qr_png_base64"
+                    alt="Código QR de asistencia">
+                  <span class="timer-badge">Actualiza en {{ qrTimeLeft() }}s</span>
                 </div>
 
                 <div class="token-display">
-                  <label>Tu Token alfanumérico:</label>
-                  <input type="text" readonly [value]="qrPayload()?.token" (focus)="$event.target.select()">
-                  <small>Muestra el QR a la cámara o dicta el token al docente.</small>
+                  <label for="studentToken">Token alfanumérico:</label>
+                  <input
+                    id="studentToken"
+                    type="text"
+                    readonly
+                    [value]="qrPayload()?.token"
+                    (focus)="selectTokenInput($event)">
+                  <small>Muestra el QR a la cámara del docente o dicta el token.</small>
                 </div>
               }
             </article>
           }
 
+          <!-- KPIs compartidos -->
           <div class="kpi-grid">
-            <agm-kpi-card label="Total Sesiones" [value]="sessionCount()" tone="neutral" />
-            <agm-kpi-card label="Tasa Asistencia" [value]="attendanceRate() + '%'" [tone]="attendanceRate() >= 80 ? 'success' : 'warning'" />
+            <agm-kpi-card
+              label="Total Sesiones"
+              [value]="sessionCount()"
+              tone="neutral" />
+            <agm-kpi-card
+              label="Tasa Asistencia"
+              [value]="attendanceRate() + '%'"
+              [tone]="attendanceRate() >= 80 ? 'success' : 'warning'" />
           </div>
-
         </aside>
 
+        <!-- =================================================================
+             MAIN – PANEL DE DATOS
+             ================================================================= -->
         <main class="data-panel">
           <div class="panel-header">
             <div class="header-titles">
-              <h2>Lista de Clase</h2>
-              <p>Total de inscritos: {{ students().length }}</p>
+              @if (isTeacher()) {
+                <h2>Lista de Clase</h2>
+                <p>Total de inscritos: {{ students().length }}</p>
+              } @else {
+                <h2>Mi Historial</h2>
+                <p>{{ selectedSubject()?.nombre || 'Materia seleccionada' }}</p>
+              }
             </div>
-            <nav class="panel-tabs">
-              <button [class.active]="rightPanelTab() === 'live'" (click)="rightPanelTab.set('live')">Registro en Vivo</button>
-              <button [class.active]="rightPanelTab() === 'history'" (click)="rightPanelTab.set('history')">Historial Histórico</button>
-            </nav>
+
+            <!-- Pestañas sólo para docente -->
+            @if (isTeacher()) {
+              <nav class="panel-tabs">
+                <button
+                  type="button"
+                  [class.active]="rightPanelTab() === 'live'"
+                  (click)="rightPanelTab.set('live')">
+                  Registro en Vivo
+                </button>
+                <button
+                  type="button"
+                  [class.active]="rightPanelTab() === 'history'"
+                  (click)="rightPanelTab.set('history')">
+                  Historial Histórico
+                </button>
+              </nav>
+            }
           </div>
 
           <div class="panel-content">
-            @if (rightPanelTab() === 'live') {
+
+            <!-- Pestaña "Registro en Vivo" (docente) -->
+            @if (isTeacher() && rightPanelTab() === 'live') {
               <div class="roster-meta">
                 <strong>Estado de la sesión actual</strong>
-                <span class="count-pill">{{ presentCount() }} / {{ students().length }} Presentes</span>
+                <span class="count-pill">
+                  {{ presentCount() }} / {{ students().length }} Registrados
+                </span>
               </div>
 
               <div class="roster-grid">
                 @for (student of liveRoster(); track student.id) {
-                  <article class="roster-card" [class.present]="student.status === 'PRESENTE'">
+                  <article
+                    class="roster-card"
+                    [class.present]="student.status === 'PRESENTE' || student.status === 'RETARDO'">
                     <div class="student-info">
                       <strong>{{ student.nombre }}</strong>
                       <span>{{ student.matricula }}</span>
                     </div>
-                    <span class="status-badge" [class]="student.tone">{{ student.status }}</span>
+                    <span class="status-badge" [class]="student.tone">
+                      {{ student.status }}
+                    </span>
                   </article>
                 } @empty {
-                  <agm-empty-state title="Sin registros" message="No hay alumnos inscritos en esta materia." />
+                  <agm-empty-state
+                    title="Sin registros"
+                    message="No hay alumnos inscritos en esta materia." />
                 }
               </div>
             }
 
-            @if (rightPanelTab() === 'history') {
+            <!-- Pestaña "Historial" (docente) o vista única (alumno) -->
+            @if (isStudent() || (isTeacher() && rightPanelTab() === 'history')) {
               <div class="history-wrapper">
                 <agm-searchable-table
                   [rows]="historyRows()"
-                  [columns]="historyColumns"
-                  searchPlaceholder="Buscar registros..." />
+                  [columns]="historyColumns()"
+                  placeholder="Buscar registros…"
+                  emptyTitle="Sin historial"
+                  emptyMessage="Aún no hay registros de asistencia para esta materia." />
               </div>
             }
+
           </div>
         </main>
 
       </div>
+
     } @else {
-      <agm-empty-state title="Sin materias" message="No tienes materias asignadas actualmente." />
+      <agm-empty-state
+        title="Sin materias"
+        message="No hay materias disponibles para el periodo seleccionado." />
     }
+
   </div>
 }
+
+<!-- =========================================================================
+     MODAL DE CONFIRMACIÓN
+     (Abrir sesión → avisa de faltas por defecto)
+     (Cerrar sesión → avisa de consecuencias antes de tiempo)
+     ========================================================================= -->
+<agm-confirmation-modal
+  [open]="pendingConfirmation() !== null"
+  [title]="confirmationTitle()"
+  [message]="confirmationMessage()"
+  [confirmLabel]="confirmationLabel()"
+  (confirm)="confirmPendingAction()"
+  (cancel)="cancelConfirmation()" />
