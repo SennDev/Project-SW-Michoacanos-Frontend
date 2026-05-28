@@ -29,4 +29,11 @@ export class AboutScreen {
   toggleMenu(): void {
     this.isMenuOpen = !this.isMenuOpen;
   }
+
+  toggleTheme(): void {
+    const root = document.documentElement;
+    const nextTheme = root.dataset['theme'] === 'dark' ? 'light' : 'dark';
+    root.dataset['theme'] = nextTheme;
+    localStorage.setItem('agm.theme', nextTheme);
+  }
 }

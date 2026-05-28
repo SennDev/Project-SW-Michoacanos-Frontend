@@ -18,6 +18,13 @@ export class LandingScreen implements OnInit {
     this.isMenuOpen = !this.isMenuOpen;
   }
 
+  toggleTheme(): void {
+    const root = document.documentElement;
+    const nextTheme = root.dataset['theme'] === 'dark' ? 'light' : 'dark';
+    root.dataset['theme'] = nextTheme;
+    localStorage.setItem('agm.theme', nextTheme);
+  }
+
   ngOnInit(): void {
     // Detecta si la página se cargó externamente con un fragmento (ej: /#features)
     this.route.fragment.subscribe(fragment => {
