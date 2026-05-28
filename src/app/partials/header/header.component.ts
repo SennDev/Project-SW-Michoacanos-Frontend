@@ -31,68 +31,80 @@ import { AuthUser } from '../../shared/models/auth.models';
             <small>{{ roleLabel }}</small>
           </span>
         </div>
-        <button class="btn ghost small" type="button" (click)="logout.emit()">Salir</button>
+        <button class="btn ghost small logout-btn" type="button" (click)="logout.emit()">Salir</button>
       </div>
     </header>
   `,
   styles: [`
+    /* ==========================================================================
+       ESTRUCTURA BASE MÓVIL (MOBILE-FIRST)
+       ========================================================================== */
+     
     .topbar {
       position: sticky;
       top: 0;
+      left: 0; /* Ancla forzosa al borde izquierdo */
+      right: 0; /* Ancla forzosa al borde derecho */
       z-index: 20;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      min-height: 74px;
-      padding: 0 30px;
+      gap: 4px;
+      min-height: 64px;
+      
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0 8px;
+      overflow: hidden; /* Evita que los elementos estiren la barra */
+      
       border-bottom: 1px solid var(--agm-border);
-      background:
-        linear-gradient(90deg, color-mix(in srgb, var(--agm-surface-glass) 96%, transparent), color-mix(in srgb, var(--agm-primary-soft) 48%, transparent));
+      background: linear-gradient(90deg, color-mix(in srgb, var(--agm-surface-glass) 96%, transparent), color-mix(in srgb, var(--agm-primary-soft) 48%, transparent));
       backdrop-filter: blur(18px);
     }
 
     .topbar-title {
       display: flex;
       align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .topbar-title strong,
-    .user-chip strong {
-      display: block;
-      line-height: 1.2;
-      letter-spacing: 0;
-    }
-
-    .topbar-title small,
-    .user-chip small {
-      display: block;
-      color: var(--agm-text-soft);
-      font-size: 0.76rem;
-      margin-top: 2px;
+      gap: 8px;
+      text-decoration: none;
+      color: inherit;
     }
 
     .brand-mark.small {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--agm-primary, #0f172a);
+      color: white;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .topbar-title strong {
+      display: block;
+      line-height: 1.2;
+    }
+
+    /* Ocultamos textos secundarios en móvil */
+    .topbar-title small,
+    .user-chip span:last-child {
+      display: none;
     }
 
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 4px;
     }
 
     .user-chip {
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 7px 10px;
+      padding: 2px;
       border: 1px solid var(--agm-border);
-      border-radius: 999px;
+      border-radius: 50%;
       background: var(--agm-surface-glass);
       box-shadow: var(--agm-shadow-soft);
     }
@@ -109,22 +121,59 @@ import { AuthUser } from '../../shared/models/auth.models';
       font-size: 0.82rem;
     }
 
-    .menu-button {
-      display: none;
+    .menu-button, .icon-btn {
+      display: inline-grid;
+      place-items: center;
+      min-width: 34px;
+      height: 34px;
     }
 
-    @media (max-width: 920px) {
+    /* BLOQUEO ABSOLUTO PARA EL BOTÓN SALIR */
+    .logout-btn {
+      flex: 0 0 auto !important; /* Prohíbe que el botón crezca o se encoja */
+      width: auto !important;
+      min-width: 0 !important; 
+      padding: 6px 12px !important;
+      margin: 0 !important;
+      font-size: 0.85rem !important;
+      white-space: nowrap !important;
+    }
+
+    /* ==========================================================================
+       ESCRITORIO Y TABLETS
+       ========================================================================== */
+    @media (min-width: 920px) {
       .topbar {
-        padding: 0 16px;
+        padding: 0 30px;
+        min-height: 74px;
+        gap: 16px;
+        overflow: visible; /* Restauramos en escritorio */
       }
 
       .menu-button {
-        display: inline-grid;
+        display: none;
+      }
+
+      .topbar-actions {
+        gap: 10px;
+      }
+
+      .user-chip {
+        gap: 9px;
+        padding: 7px 10px;
+        border-radius: 999px;
+      }
+
+      .topbar-title > span:not(.brand-mark) {
+        display: block !important; /* Aseguramos que el texto vuelva a aparecer */
       }
 
       .topbar-title small,
       .user-chip span:last-child {
-        display: none;
+        display: block;
+        color: var(--agm-text-soft);
+        font-size: 0.76rem;
+        margin-top: 2px;
       }
     }
   `]
@@ -142,12 +191,8 @@ export class HeaderComponent {
 
   get roleLabel(): string {
     const role = this.user?.role;
-    if (role === 'docente') {
-      return 'Docente';
-    }
-    if (role === 'alumno') {
-      return 'Alumno';
-    }
+    if (role === 'docente') return 'Docente';
+    if (role === 'alumno') return 'Alumno';
     return 'Administrador';
   }
 }

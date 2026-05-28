@@ -5,6 +5,12 @@
 html {
   min-height: 100%;
   background: var(--agm-bg);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden; /* Esto es magia: guillotina cualquier elemento que sobresalga */
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
@@ -18,6 +24,12 @@ body {
   font-family: var(--agm-font);
   font-size: 15px;
   letter-spacing: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden; /* Esto es magia: guillotina cualquier elemento que sobresalga */
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 button,
