@@ -169,9 +169,14 @@
 
             <article class="dashboard-card pad">
               <div class="card-header">
-                <h3>Crear Actividad Evaluativa</h3>
+                <h3>{{ editingActivity() ? 'Editar Actividad' : 'Crear Actividad Evaluativa' }}</h3>
+                @if (editingActivity()) {
+                  <button class="btn ghost small outline" type="button" (click)="cancelEditActivity()">Cancelar Edición</button>
+                }
               </div>
-              <p class="muted-text">Abre un espacio de evaluación (Examen, Tarea, Proyecto) dentro de una categoría.</p>
+              <p class="muted-text">
+                {{ editingActivity() ? 'Modifica los parámetros de la evaluación.' : 'Abre un espacio de evaluación dentro de una categoría.' }}
+              </p>
 
               <div class="form-stack">
                 <div class="field">
@@ -192,9 +197,32 @@
                   <input type="number" min="1" [(ngModel)]="activityMaxPoints">
                 </div>
 
-                <button class="btn primary block" type="button" style="margin-top: auto;" [disabled]="creatingActivity() || !activityCategoryId || !activityName.trim()" (click)="createActivity()">
-                  Aperturar Actividad
+                <button class="btn primary block" type="button" style="margin-top: 10px;" 
+                        [disabled]="isProcessingActivity() || !activityCategoryId || !activityName.trim()" 
+                        (click)="saveActivity()">
+                  {{ isProcessingActivity() ? 'Procesando...' : (editingActivity() ? 'Guardar Cambios' : 'Aperturar Actividad') }}
                 </button>
+              </div>
+
+              <div class="existing-activities mt-24">
+                <div class="form-divider"><span>Actividades Administradas</span></div>
+                
+                <div class="activity-mini-list scrollable-y">
+                  @for (act of activities(); track act.id) {
+                    <div class="mini-act-row" [class.is-editing]="editingActivity()?.id === act.id">
+                      <div class="act-info">
+                        <strong>{{ act.nombre }}</strong>
+                        <span>{{ categoryName(act.categoria_id) }} | Max: {{ act.max_puntos }} pts</span>
+                      </div>
+                      <div class="act-actions">
+                        <button class="btn icon-btn ghost small" (click)="setEditMode(act)" title="Editar Actividad">✏️</button>
+                        <button class="btn icon-btn ghost danger-text small" (click)="deleteActivity(act.id)" title="Eliminar Actividad">🗑️</button>
+                      </div>
+                    </div>
+                  } @empty {
+                    <p class="empty-hint">No hay actividades creadas para esta materia.</p>
+                  }
+                </div>
               </div>
             </article>
           </div>

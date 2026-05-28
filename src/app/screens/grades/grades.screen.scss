@@ -667,3 +667,78 @@
     min-width: 640px;
   }
 }
+
+/* ==========================================================================
+   GESTIÓN DE ACTIVIDADES (CRUD MINI-LIST)
+   ========================================================================== */
+.mt-24 {
+  margin-top: 24px;
+}
+
+.form-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 16px 0;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--agm-border);
+  }
+
+  span {
+    padding: 0 16px;
+    color: var(--agm-text-soft);
+    font-size: 0.75rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.activity-mini-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  padding-right: 4px;
+}
+
+.mini-act-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--agm-border);
+  border-radius: var(--agm-radius-sm);
+  background: var(--agm-surface);
+  transition: all 0.2s;
+
+  &.is-editing {
+    border-color: var(--agm-primary);
+    background: var(--agm-primary-soft);
+  }
+}
+
+.act-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.danger-text {
+  color: var(--agm-danger) !important;
+  
+  &:hover {
+    background: var(--agm-danger-soft) !important;
+  }
+}
+
+.empty-hint {
+  font-size: 0.85rem;
+  color: var(--agm-text-soft);
+  text-align: center;
+  font-style: italic;
+  margin: 10px 0;
+}

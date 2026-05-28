@@ -47,7 +47,8 @@ export class GradesScreen implements OnInit, OnDestroy {
   // --- ESTADOS GLOBALES ---
   readonly loading = signal(true);
   readonly savingWeights = signal(false);
-  readonly creatingActivity = signal(false);
+  readonly isProcessingActivity = signal(false); // Reemplaza a creatingActivity
+  readonly editingActivity = signal<LocalActivity | null>(null);
   readonly importingGrades = signal(false);
 
   readonly subjects = signal<Subject[]>([]);
@@ -191,7 +192,7 @@ export class GradesScreen implements OnInit, OnDestroy {
       weights: this.grades.listWeights(subjectId).pipe(catchError(() => of([] as WeightCategory[]))),
       summary: this.grades.getConcentrado(subjectId).pipe(catchError(() => of([] as GradeSummary[]))),
       students: this.academics.listStudentsBySubject(subjectId).pipe(catchError(() => of([] as Student[]))),
-      activities: of(this.grades.getLocalActivities(subjectId))
+      activities: this.grades.listActivities(subjectId).pipe(catchError(() => of([] as LocalActivity[])))
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ weights, summary, students, activities }) => {
         this.weights.set(weights);
@@ -292,28 +293,83 @@ export class GradesScreen implements OnInit, OnDestroy {
     });
   }
 
-  createActivity(): void {
+  // --- GESTIÓN DE ACTIVIDADES (CRUD) ---
+
+  setEditMode(act: LocalActivity): void {
+    this.editingActivity.set(act);
+    this.activityCategoryId = act.categoria_id;
+    this.activityName = act.nombre;
+    this.activityMaxPoints = act.max_puntos;
+  }
+
+  cancelEditActivity(): void {
+    this.editingActivity.set(null);
+    this.activityCategoryId = null;
+    this.activityName = '';
+    this.activityMaxPoints = 100;
+  }
+
+  saveActivity(): void {
     const subjectId = this.selectedSubjectId();
     if (!subjectId || !this.activityCategoryId || !this.activityName.trim()) {
       return this.toasts.warning('Revisa los datos de la actividad');
     }
-    this.creatingActivity.set(true);
-    this.grades.createActivity({
-      materia_id: subjectId,
+
+    this.isProcessingActivity.set(true);
+    const payload = {
       categoria_id: this.activityCategoryId,
       nombre: this.activityName.trim(),
       max_puntos: Number(this.activityMaxPoints || 100)
-    }).pipe(
-      finalize(() => this.creatingActivity.set(false)),
+    };
+
+    const currentEdit = this.editingActivity();
+
+    if (currentEdit) {
+      // Flujo de Actualización (PUT)
+      this.grades.updateActivity(currentEdit.id, payload).pipe(
+        finalize(() => this.isProcessingActivity.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe({
+        next: () => {
+          this.toasts.success('Actividad actualizada correctamente');
+          this.cancelEditActivity();
+          this.loadSubjectData(subjectId);
+        },
+        error: (error: unknown) => this.toasts.error('Error al actualizar', errorMessage(error))
+      });
+    } else {
+      // Flujo de Creación (POST)
+      this.grades.createActivity({ materia_id: subjectId, ...payload }).pipe(
+        finalize(() => this.isProcessingActivity.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe({
+        next: (response) => {
+          this.toasts.success('Actividad creada exitosamente');
+          this.cancelEditActivity();
+          this.selectedActivityId = response.id;
+          this.loadSubjectData(subjectId);
+        },
+        error: (error: unknown) => this.toasts.error('Error al crear', errorMessage(error))
+      });
+    }
+  }
+
+  deleteActivity(activityId: number): void {
+    if (!confirm('¿Estás seguro de eliminar esta actividad? Se borrarán permanentemente las calificaciones de los alumnos asociadas a ella.')) {
+      return;
+    }
+
+    const subjectId = this.selectedSubjectId();
+    this.grades.deleteActivity(activityId).pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (response) => {
-        this.toasts.success('Actividad creada exitosamente');
-        this.activityName = '';
-        this.selectedActivityId = response.id;
-        this.loadSubjectData(subjectId);
+      next: () => {
+        this.toasts.success('Actividad y calificaciones eliminadas');
+        if (this.selectedActivityId === activityId) this.selectedActivityId = null;
+        if (this.editingActivity()?.id === activityId) this.cancelEditActivity();
+        if (subjectId) this.loadSubjectData(subjectId);
       },
-      error: (error: unknown) => this.toasts.error('Error al crear actividad', errorMessage(error))
+      error: (error: unknown) => this.toasts.error('Error al eliminar', errorMessage(error))
     });
   }
 
