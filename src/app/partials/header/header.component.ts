@@ -14,7 +14,7 @@ import { AuthUser } from '../../shared/models/auth.models';
 
       <a routerLink="/dashboard" class="topbar-title">
         <span class="brand-mark small">A</span>
-        <span>
+        <span class="title-text">
           <strong>AGM</strong>
           <small>Academic Grade Management</small>
         </span>
@@ -36,144 +36,44 @@ import { AuthUser } from '../../shared/models/auth.models';
     </header>
   `,
   styles: [`
-    /* ==========================================================================
-       ESTRUCTURA BASE MÓVIL (MOBILE-FIRST)
-       ========================================================================== */
-     
     .topbar {
-      position: sticky;
-      top: 0;
-      left: 0; /* Ancla forzosa al borde izquierdo */
-      right: 0; /* Ancla forzosa al borde derecho */
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 4px;
-      min-height: 64px;
-      
-      width: 100%;
-      box-sizing: border-box;
-      padding: 0 8px;
-      overflow: hidden; /* Evita que los elementos estiren la barra */
-      
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; min-height: 74px; padding: 0 30px;
       border-bottom: 1px solid var(--agm-border);
       background: linear-gradient(90deg, color-mix(in srgb, var(--agm-surface-glass) 96%, transparent), color-mix(in srgb, var(--agm-primary-soft) 48%, transparent));
       backdrop-filter: blur(18px);
+      
+      width: 100%;
+      max-width: 100vw;
+      box-sizing: border-box;
     }
 
-    .topbar-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-      color: inherit;
-    }
+    .topbar-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .topbar-title strong, .user-chip strong { display: block; line-height: 1.2; letter-spacing: 0; }
+    .topbar-title small, .user-chip small { display: block; color: var(--agm-text-soft); font-size: 0.76rem; margin-top: 2px; }
+    .brand-mark.small { width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .user-chip { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid var(--agm-border); border-radius: 999px; background: var(--agm-surface-glass); box-shadow: var(--agm-shadow-soft); }
+    .avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: white; background: linear-gradient(135deg, var(--agm-primary), var(--agm-secondary)); font-weight: 900; font-size: 0.82rem; flex-shrink: 0; }
+    .menu-button { display: none; }
 
-    .brand-mark.small {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      display: grid;
-      place-items: center;
-      background: var(--agm-primary, #0f172a);
-      color: white;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
+    @media (max-width: 920px) {
+      .topbar { padding: 0 12px; gap: 8px; }
+      .menu-button { display: inline-grid; flex-shrink: 0; }
+      .topbar-title small, .user-chip span:last-child { display: none; }
+      
+      /* Protecciones para que el botón de salir no se corte */
+      .topbar-title { flex: 1 1 auto; overflow: hidden; }
+      .title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+      .topbar-actions .btn { padding: 6px 12px; white-space: nowrap; flex-shrink: 0; }
+      .user-chip { gap: 0; padding: 2px; }
 
-    .topbar-title strong {
-      display: block;
-      line-height: 1.2;
-    }
-
-    /* Ocultamos textos secundarios en móvil */
-    .topbar-title small,
-    .user-chip span:last-child {
-      display: none;
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .user-chip {
-      display: flex;
-      align-items: center;
-      padding: 2px;
-      border: 1px solid var(--agm-border);
-      border-radius: 50%;
-      background: var(--agm-surface-glass);
-      box-shadow: var(--agm-shadow-soft);
-    }
-
-    .avatar {
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      color: white;
-      background: linear-gradient(135deg, var(--agm-primary), var(--agm-secondary));
-      font-weight: 900;
-      font-size: 0.82rem;
-    }
-
-    .menu-button, .icon-btn {
-      display: inline-grid;
-      place-items: center;
-      min-width: 34px;
-      height: 34px;
-    }
-
-    /* BLOQUEO ABSOLUTO PARA EL BOTÓN SALIR */
-    .logout-btn {
-      flex: 0 0 auto !important; /* Prohíbe que el botón crezca o se encoja */
-      width: auto !important;
-      min-width: 0 !important; 
-      padding: 6px 12px !important;
-      margin: 0 !important;
-      font-size: 0.85rem !important;
-      white-space: nowrap !important;
-    }
-
-    /* ==========================================================================
-       ESCRITORIO Y TABLETS
-       ========================================================================== */
-    @media (min-width: 920px) {
-      .topbar {
-        padding: 0 30px;
-        min-height: 74px;
-        gap: 16px;
-        overflow: visible; /* Restauramos en escritorio */
-      }
-
-      .menu-button {
-        display: none;
-      }
-
-      .topbar-actions {
-        gap: 10px;
-      }
-
-      .user-chip {
-        gap: 9px;
-        padding: 7px 10px;
-        border-radius: 999px;
-      }
-
-      .topbar-title > span:not(.brand-mark) {
-        display: block !important; /* Aseguramos que el texto vuelva a aparecer */
-      }
-
-      .topbar-title small,
-      .user-chip span:last-child {
-        display: block;
-        color: var(--agm-text-soft);
-        font-size: 0.76rem;
-        margin-top: 2px;
+      .logout-btn { 
+        padding: 4px 10px !important;
+        min-width: auto !important;   
+        width: auto !important;       
+        flex: 0 0 auto !important;    
       }
     }
   `]
